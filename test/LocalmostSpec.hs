@@ -112,6 +112,8 @@ spec = do
       computePolicy rt (sh "echo foo") `shouldBe` Allow
       computePolicy rt (sh "echo -foo") `shouldBe` Allow
       computePolicy rt (sh "echo @") `shouldBe` Allow
+      computePolicy rt (sh "echo \"test\"") `shouldBe` Allow
+      computePolicy rt (sh "echo \"*.txt\"") `shouldBe` Allow
 
     it "computes policies correctly (opt metavar)" $ do
       let rt = testRt [("echo @opt", Allow)]
