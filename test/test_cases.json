@@ -1,0 +1,121 @@
+[
+  {
+    "name": "edge cases",
+    "config": {
+      "allow": [{"rule": "echo"}]
+    },
+    "cases": [
+      {"input": "echo", "expect": "allow"},
+      {
+        "input": "$(echo)",
+        "expect": "ask",
+        "comment": "Contains two commands; first one's name is not static text, thus will never match."
+      }
+    ]
+  },
+  {
+    "name": "redirects",
+    "config": {
+      "allow": [
+        {"rule": "foo"},
+        {"rule": "nope", "redirect": false},
+        {"rule": "yep", "redirect": true}
+      ],
+      "deny": [
+        {"rule": "foo2"},
+        {"rule": "nope2", "redirect": false},
+        {"rule": "yep2", "redirect": true}
+      ]
+    },
+    "cases": [
+      {"input": "foo", "expect": "allow"},
+      {"input": "foo 2>&1", "expect": "allow"},
+      {"input": "foo 2>&1 >/dev/null", "expect": "allow"},
+      {"input": "foo 2>&3", "expect": "allow"},
+      {"input": "foo > bar", "expect": "ask"},
+      {"input": "foo > bar 2> /dev/null", "expect": "ask"},
+      {"input": "foo < bar", "expect": "allow"},
+      {"input": "foo <> bar", "expect": "ask"},
+      {"input": "foo >> bar", "expect": "ask"},
+      {"input": "foo >| bar", "expect": "ask"},
+      {"input": "foo > /dev/null", "expect": "allow"},
+      {"input": "foo 2> /dev/null", "expect": "allow"},
+      {"input": "foo < /dev/urandom", "expect": "allow"},
+      {"input": "foo <<EOF\ntest\nEOF", "expect": "allow"},
+      {"input": "foo <<< 'hello'", "expect": "allow"},
+      {"input": "nope", "expect": "allow"},
+      {"input": "nope < /dev/urandom", "expect": "ask"},
+      {"input": "yep > personal_notes.txt", "expect": "allow"},
+      {"input": "foo2", "expect": "deny"},
+      {"input": "foo2 > /dev/null", "expect": "deny"},
+      {"input": "nope2", "expect": "deny"},
+      {"input": "nope2 > test", "expect": "ask"},
+      {"input": "yep2", "expect": "deny"},
+      {"input": "yep2 > test", "expect": "deny"},
+      {"input": "yep2 > /dev/null", "expect": "deny"}
+    ]
+  },
+  {
+    "name": "pipes",
+    "config": {
+      "allow": [
+        {"rule": "foo"},
+        {"rule": "outputter", "pipe": "out"},
+        {"rule": "inputter", "pipe": "in"},
+        {"rule": "nothing", "pipe": false}
+      ],
+      "deny": [
+        {"rule": "foo2"},
+        {"rule": "outputter2", "pipe": "out"},
+        {"rule": "inputter2", "pipe": "in"},
+        {"rule": "nothing2", "pipe": false}
+      ]
+    },
+    "cases": [
+      {"input": "foo", "expect": "allow"},
+      {"input": "inputter", "expect": "allow"},
+      {"input": "outputter", "expect": "allow"},
+      {"input": "nothing", "expect": "allow"},
+      {"input": "outputter | foo", "expect": "allow"},
+      {"input": "foo | inputter", "expect": "allow"},
+      {"input": "foo | outputter", "expect": "ask"},
+      {"input": "inputter | foo", "expect": "ask"},
+      {"input": "nothing | foo", "expect": "ask"},
+      {"input": "foo | nothing", "expect": "ask"},
+      {"input": "foo2", "expect": "deny"},
+      {"input": "foo2 | foo", "expect": "deny"},
+      {"input": "outputter2 | foo", "expect": "deny"},
+      {"input": "foo | inputter2", "expect": "deny"},
+      {"input": "nothing2 | foo", "expect": "ask"}
+    ]
+  },
+  {
+    "name": "nested evil command",
+    "config": {
+      "allow": [{"rule": "echo @*"}]
+    },
+    "cases": [
+      {"input": "for d in /tmp/*; do echo \"$(evil $d)\"; ls \"$d\"; echo; done", "expect": "ask"},
+      {"input": "echo <(evil)", "expect": "ask"},
+      {"input": "{ evil; }", "expect": "ask"},
+      {"input": "select x in a b; do evil; done", "expect": "ask"},
+      {"input": "f() { evil; }; f", "expect": "ask"},
+      {"input": "x=$(evil)", "expect": "ask"}
+    ]
+  },
+  {
+    "name": "git",
+    "config": {
+      "allow": [{"rule": "git @(-C @arg)? @{log,status,diff,show,blame} @*"}]
+    },
+    "cases": [
+      {"input": "git log", "expect": "allow"},
+      {"input": "git log mybranch", "expect": "allow"},
+      {"input": "git log $mybranch", "expect": "allow"},
+      {"input": "git log $(get-branch-name)", "expect": "ask"},
+      {"input": "git -C . log", "expect": "allow"},
+      {"input": "git rm", "expect": "ask"},
+      {"input": "git -C . rm", "expect": "ask"}
+    ]
+  }
+]

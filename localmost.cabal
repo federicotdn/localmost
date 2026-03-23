@@ -1,0 +1,66 @@
+cabal-version:      3.0
+name:               localmost
+version:            0.1.0.0
+license:            GPL-3.0-only
+license-file:       LICENSE
+author:             Federico Tedin
+maintainer:         federicotedin@gmail.com
+category:           Development
+build-type:         Simple
+
+flag dev
+    description:        Development build with no optimization
+    default:            True
+    manual:             True
+
+common shared
+    ghc-options:        -Wall
+    if flag(dev)
+        ghc-options:    -O0
+    else
+        ghc-options:    -O1
+    default-language:   GHC2021
+    default-extensions: OverloadedStrings
+    build-depends:      base ^>=4.21.0.0
+
+library
+    import:           shared
+    hs-source-dirs:   src
+    exposed-modules:  Localmost
+                    , Utils
+                    , Shell
+                    , Types
+                    , Protocol
+                    , Config
+    build-depends:    ShellCheck ==0.11.0
+                    , aeson ^>=2.2.3.0
+                    , bytestring
+                    , text
+                    , containers
+                    , directory
+                    , filepath
+                    , transformers
+
+executable localmost
+    import:           shared
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    build-depends:    localmost
+                    , optparse-applicative ^>=0.19.0.0
+
+test-suite test-localmost
+    import:           shared
+    type:             exitcode-stdio-1.0
+    main-is:          Spec.hs
+    hs-source-dirs:   test
+    other-modules:    LocalmostSpec
+                    , ShellSpec
+                    , ConfigSpec
+                    , FullSpec
+                    , TestUtils
+    build-depends:    localmost
+                    , hspec ^>=2.11.16
+                    , ShellCheck
+                    , text
+                    , aeson
+                    , bytestring
