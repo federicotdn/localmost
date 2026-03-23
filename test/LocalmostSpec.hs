@@ -149,6 +149,12 @@ spec = do
       computePolicy rt (sh "echo") `shouldBe` Allow
       computePolicy rt (sh "echo foo") `shouldBe` Allow
       computePolicy rt (sh "echo foo bar") `shouldBe` Allow
+      let rt' = testRt [("echo @arg* bar", Allow)]
+      computePolicy rt' (sh "echo") `shouldBe` Ask
+      computePolicy rt' (sh "echo foo") `shouldBe` Ask
+      computePolicy rt' (sh "echo bar") `shouldBe` Allow
+      computePolicy rt' (sh "echo foo bar") `shouldBe` Allow
+      computePolicy rt' (sh "echo foo foo2 bar") `shouldBe` Allow
 
     it "computes policies correctly (arg metavar with quant ?)" $ do
       let rt = testRt [("echo @arg?", Allow)]
