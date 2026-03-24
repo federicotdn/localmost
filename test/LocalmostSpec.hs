@@ -115,6 +115,19 @@ spec = do
       computePolicy rt (sh "echo \"test\"") `shouldBe` Allow
       computePolicy rt (sh "echo \"*.txt\"") `shouldBe` Allow
 
+    it "computes policies correctly (match arbitrary token)" $ do
+      let rt = testRt [("echo $foo", Allow)]
+      computePolicy rt (sh "echo") `shouldBe` Ask
+      computePolicy rt (sh "echo $foo") `shouldBe` Allow
+      computePolicy rt (sh "echo '$foo'") `shouldBe` Ask
+      computePolicy rt (sh "echo \"$foo\"") `shouldBe` Ask
+      let rt' = testRt [("echo ${foo:-bar}", Allow)]
+      computePolicy rt' (sh "echo $foo") `shouldBe` Ask
+      computePolicy rt' (sh "echo bar") `shouldBe` Ask
+      computePolicy rt' (sh "echo ${foo}") `shouldBe` Ask
+      computePolicy rt' (sh "echo ${foo:-b}") `shouldBe` Ask
+      computePolicy rt' (sh "echo ${foo:-bar}") `shouldBe` Allow
+
     it "computes policies correctly (opt metavar)" $ do
       let rt = testRt [("echo @opt", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Ask

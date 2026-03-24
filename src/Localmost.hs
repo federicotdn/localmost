@@ -412,7 +412,8 @@ partMatches rule input = case (rule, input) of
   (At, Token t) -> tokenAsText t False == Just "@"
   (Token rt, Token it) ->
     let rText = tokenAsText rt True
-     in isJust rText && rText == tokenAsText it False
+        eq = rt == it
+     in (isJust rText && rText == tokenAsText it False) || eq
   _ -> False
 
 check :: Proto -> IO ()
