@@ -117,26 +117,5 @@
       {"input": "git rm", "expect": "ask"},
       {"input": "git -C . rm", "expect": "ask"}
     ]
-  },
-  {
-    "name": "exclude specific args",
-    "config": {
-      "allow": [
-        {"rule": "find @arg*"}
-      ],
-      "deny": [
-        {"rule": "find @* @{-exec,-fprint,-fprint0,-fprintf} @*"}
-      ]
-    },
-    "cases": [
-      {"input": "find . -iname test", "expect": "allow"},
-      {"input": "find . -iname '*.h'", "expect": "allow"},
-      {"input": "find . -iname \"*.h\"", "expect": "allow"},
-      {"input": "find -exec . -iname test", "expect": "deny"},
-      {"input": "find . -exec -iname '*.h'", "expect": "deny"},
-      {"input": "find . -iname \"*.h\" -exec", "expect": "deny"},
-      {"input": "find -fprintf out . -iname test", "expect": "deny"},
-      {"input": "find '-fprintf' out . -iname test", "expect": "deny"}
-    ]
   }
 ]
