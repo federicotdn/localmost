@@ -72,7 +72,6 @@ data Part
   | Choice [Part]
   | Group [Part]
   | Arg
-  | Opt
   | Int
   | At
   | Quant Part Count
@@ -87,7 +86,6 @@ instance Show Part where
   show (Choice list) = "Choice " ++ show list
   show (Group list) = "Group " ++ show list
   show Arg = "Arg"
-  show Opt = "Opt"
   show Int = "Int"
   show At = "At"
   show (Quant p c) = "Quant " ++ show p ++ " " ++ show c

@@ -231,7 +231,6 @@ parseMetaExpr :: ReadP Part
 parseMetaExpr = do
   meta <- R.choice $ map R.string ["opt", "arg", "int", "@", "*"]
   let meta' = case meta of
-        "opt" -> Just Opt
         "arg" -> Just Arg
         "int" -> Just Int
         "@" -> Just At
@@ -407,7 +406,6 @@ isSplitting _ = False
 partMatches :: Part -> Part -> Bool
 partMatches rule input = case (rule, input) of
   (Arg, _) -> (not . isSplitting) input
-  (Opt, Token t) -> maybe False ("-" `T.isPrefixOf`) (tokenAsText t False)
   (Int, Token t) -> maybe False isInt (tokenAsText t False)
   (At, Token t) -> tokenAsText t False == Just "@"
   (Token rt, Token it) ->

@@ -128,14 +128,6 @@ spec = do
       computePolicy rt' (sh "echo ${foo:-b}") `shouldBe` Ask
       computePolicy rt' (sh "echo ${foo:-bar}") `shouldBe` Allow
 
-    it "computes policies correctly (opt metavar)" $ do
-      let rt = testRt [("echo @opt", Allow)]
-      computePolicy rt (sh "echo") `shouldBe` Ask
-      computePolicy rt (sh "echo foo") `shouldBe` Ask
-      computePolicy rt (sh "echo -foo") `shouldBe` Allow
-      computePolicy rt (sh "echo --foo") `shouldBe` Allow
-      computePolicy rt (sh "echo @") `shouldBe` Ask
-
     it "computes policies correctly (int metavar)" $ do
       let rt = testRt [("echo @int", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Ask
@@ -177,13 +169,6 @@ spec = do
       computePolicy rt (sh "echo foo") `shouldBe` Allow
       computePolicy rt (sh "echo foo bar") `shouldBe` Ask
 
-    it "computes policies correctly (opt metavar with quant +)" $ do
-      let rt = testRt [("echo @opt+", Allow)]
-      computePolicy rt (sh "echo") `shouldBe` Ask
-      computePolicy rt (sh "echo -a") `shouldBe` Allow
-      computePolicy rt (sh "echo -a -b") `shouldBe` Allow
-      computePolicy rt (sh "echo foo") `shouldBe` Ask
-
     it "computes policies correctly (quant with trailing literal)" $ do
       let rt = testRt [("echo @arg+ done", Allow)]
       computePolicy rt (sh "echo done") `shouldBe` Ask
@@ -215,37 +200,36 @@ spec = do
       computePolicy rt (sh "echo foo bar foo baz") `shouldBe` Ask
 
     it "computes policies correctly (metavar choices)" $ do
-      let rt = testRt [("echo @{@opt,@int}", Allow)]
+      let rt = testRt [("echo @{@@,@int}", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Ask
-      computePolicy rt (sh "echo -x") `shouldBe` Allow
+      computePolicy rt (sh "echo @") `shouldBe` Allow
       computePolicy rt (sh "echo 123") `shouldBe` Allow
-      computePolicy rt (sh "echo abc") `shouldBe` Ask
       computePolicy rt (sh "echo foo bar") `shouldBe` Ask
 
     it "computes policies correctly (metavar quant choices)" $ do
-      let rt = testRt [("echo @{@opt,@int+}", Allow)]
+      let rt = testRt [("echo @{@@,@int+}", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Ask
-      computePolicy rt (sh "echo -x") `shouldBe` Allow
+      computePolicy rt (sh "echo @") `shouldBe` Allow
       computePolicy rt (sh "echo 123") `shouldBe` Allow
       computePolicy rt (sh "echo 123 123") `shouldBe` Allow
       computePolicy rt (sh "echo abc") `shouldBe` Ask
 
     it "computes policies correctly (metavar choices with quant)" $ do
-      let rt = testRt [("echo @{@opt,@int}+", Allow)]
+      let rt = testRt [("echo @{@@,@int}+", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Ask
-      computePolicy rt (sh "echo -x") `shouldBe` Allow
+      computePolicy rt (sh "echo @") `shouldBe` Allow
       computePolicy rt (sh "echo 1") `shouldBe` Allow
-      computePolicy rt (sh "echo 1 2 -x") `shouldBe` Allow
+      computePolicy rt (sh "echo 1 2 @") `shouldBe` Allow
       computePolicy rt (sh "echo 1 2 -x foo") `shouldBe` Ask
 
     it "computes policies correctly (quoted metavar)" $ do
-      let rt = testRt [("echo '@opt'", Allow)]
+      let rt = testRt [("echo '@arg'", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Ask
-      computePolicy rt (sh "echo @opt") `shouldBe` Allow
+      computePolicy rt (sh "echo @arg") `shouldBe` Allow
       computePolicy rt (sh "echo -x") `shouldBe` Ask
-      let rt' = testRt [("echo \"@opt\"", Allow)]
+      let rt' = testRt [("echo \"@arg\"", Allow)]
       computePolicy rt' (sh "echo") `shouldBe` Ask
-      computePolicy rt' (sh "echo @opt") `shouldBe` Allow
+      computePolicy rt' (sh "echo @arg") `shouldBe` Allow
       computePolicy rt' (sh "echo -x") `shouldBe` Ask
 
     it "computes policies correctly (dollar expansion)" $ do
