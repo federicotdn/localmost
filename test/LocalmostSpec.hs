@@ -119,6 +119,14 @@ spec = do
       computePolicy rt (sh "echo @") `shouldBe` Allow
       computePolicy rt (sh "echo \"test\"") `shouldBe` Allow
       computePolicy rt (sh "echo \"*.txt\"") `shouldBe` Allow
+      computePolicy rt (sh "echo $foo") `shouldBe` Ask
+      computePolicy rt (sh "echo ${foo}") `shouldBe` Ask
+      computePolicy rt (sh "echo $(foo)") `shouldBe` Ask
+      computePolicy rt (sh "echo `foo`") `shouldBe` Ask
+      computePolicy rt (sh "echo {a,b,c}") `shouldBe` Ask
+      computePolicy rt (sh "echo *.a") `shouldBe` Ask
+      computePolicy rt (sh "echo \"${arr[@]}\"") `shouldBe` Ask
+      computePolicy rt (sh "echo !(*.a)") `shouldBe` Ask
 
     it "computes policies correctly (match arbitrary token)" $ do
       let rt = testRt [("echo $foo", Allow)]
