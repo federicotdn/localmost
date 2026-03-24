@@ -229,14 +229,12 @@ asMetaPart t =
 
 parseMetaExpr :: ReadP Part
 parseMetaExpr = do
-  meta <- R.choice $ map R.string ["opt", "arg", "int", "@", "*"]
+  meta <- R.choice $ map R.string ["arg", "int", "anything", "@"]
   let meta' = case meta of
         "arg" -> Just Arg
         "int" -> Just Int
+        "anything" -> Just PAnything
         "@" -> Just At
-        -- Special case for convenience: @* is shorthand for @arg*
-        -- This mirrors somehow Claude Code's :*
-        "*" -> Just (Quant Arg (Count 0 Nothing))
         _ -> Nothing
   result <- case meta' of
     Just m -> do
@@ -244,11 +242,14 @@ parseMetaExpr = do
       if atEnd
         then pure m
         else do
-          quant <- R.get
-          let ewrapped = parseQuantifier [quant] m
-          case ewrapped of
-            Just wrapped -> pure wrapped
-            _ -> R.pfail
+          if m == PAnything
+            then R.pfail -- Anything can't have quantifiers
+            else do
+              quant <- R.get
+              let ewrapped = parseQuantifier [quant] m
+              case ewrapped of
+                Just wrapped -> pure wrapped
+                _ -> R.pfail
     Nothing -> R.pfail
   R.eof
   pure result
@@ -334,7 +335,7 @@ redirectsMatch Rule {rRedirectAccess = ra} input = case ra of
 allPartsMatch :: [Part] -> [Part] -> Bool
 allPartsMatch rparts = execute (compile rparts)
 
-data Instr = Match Part | Anything | Fork Int | Jump Int | Accept deriving (Show, Eq)
+data Instr = Match Part | Fork Int | Jump Int | Accept deriving (Show, Eq)
 
 compile :: [Part] -> [Instr]
 compile parts = emit parts ++ [Accept]
@@ -343,6 +344,8 @@ compile parts = emit parts ++ [Accept]
     emit (Choice alts : rest) = emitChoice alts ++ emit rest
     emit (Group gparts : rest) = emit gparts ++ emit rest
     emit (Quant inner c : rest) = emitQuant inner c ++ emit rest
+    -- @anything is basically @arg*, but also matches splitting tokens.
+    emit (PAnything : rest) = [Fork 3, Match PAnything, Jump (-2)] ++ emit rest
     emit (p : rest) = Match p : emit rest
 
     emitChoice [] = []
@@ -357,13 +360,7 @@ compile parts = emit parts ++ [Accept]
           blen = length body
           mandatory = concat (replicate mn body)
        in case mx of
-            Nothing ->
-              -- Special case: @arg* or @* can match any parts, even if these
-              -- could split to more parts on evaluation (e.g. $test or $(foo)).
-              -- A single @arg will only match a non-splitting part.
-              if inner == Arg && mn == 0
-                then [Fork 3, Anything, Jump (-2)]
-                else mandatory ++ [Fork (blen + 2)] ++ body ++ [Jump (-(blen + 1))]
+            Nothing -> mandatory ++ [Fork (blen + 2)] ++ body ++ [Jump (-(blen + 1))]
             Just mx' ->
               let remaining = mx' - mn
                   opt 0 = []
@@ -396,7 +393,6 @@ execute instrs = go (IntSet.singleton 0)
     -- Try consuming one token at a given state
     step tok pc = case instrAt pc of
       Just (Match p) -> [pc + 1 | partMatches p tok]
-      Just Anything -> [pc + 1]
       _ -> []
 
 isSplitting :: Part -> Bool
@@ -405,6 +401,7 @@ isSplitting _ = False
 
 partMatches :: Part -> Part -> Bool
 partMatches rule input = case (rule, input) of
+  (PAnything, _) -> True
   (Arg, _) -> (not . isSplitting) input
   (Int, Token t) -> maybe False isInt (tokenAsText t False)
   (At, Token t) -> tokenAsText t False == Just "@"

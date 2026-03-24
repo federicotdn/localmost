@@ -74,6 +74,7 @@ data Part
   | Arg
   | Int
   | At
+  | PAnything
   | Quant Part Count
   deriving (Eq)
 
@@ -88,6 +89,7 @@ instance Show Part where
   show Arg = "Arg"
   show Int = "Int"
   show At = "At"
+  show PAnything = "Anything"
   show (Quant p c) = "Quant " ++ show p ++ " " ++ show c
 
 instance FromJSON Policy where parseJSON = genericParseJSON jsonOptions

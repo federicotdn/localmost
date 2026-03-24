@@ -92,7 +92,7 @@
   {
     "name": "nested evil command",
     "config": {
-      "allow": [{"rule": "echo @*"}]
+      "allow": [{"rule": "echo @anything"}]
     },
     "cases": [
       {"input": "for d in /tmp/*; do echo \"$(evil $d)\"; ls \"$d\"; echo; done", "expect": "ask"},
@@ -106,7 +106,7 @@
   {
     "name": "git",
     "config": {
-      "allow": [{"rule": "git @(-C @arg)? @{log,status,diff,show,blame} @*"}]
+      "allow": [{"rule": "git @(-C @arg)? @{log,status,diff,show,blame} @anything"}]
     },
     "cases": [
       {"input": "git log", "expect": "allow"},

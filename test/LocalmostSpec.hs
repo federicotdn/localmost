@@ -42,6 +42,11 @@ spec = do
       let cfg = defaultConfig {cAllow = Just [tr {rRule = ""}]}
       parseConfig cfg `shouldSatisfy` isLeft
 
+    it "rejects rules with quantifier @anything" $ do
+      let rules = ["foo @anything+", "foo @anything?", "foo @anything*"]
+      let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
+      mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
+
   describe "buildCommand" $ do
     it "detects pipe positions correctly" $ do
       case sCommands (sh "foo") of
@@ -176,8 +181,8 @@ spec = do
       computePolicy rt (sh "echo foo bar done") `shouldBe` Allow
       computePolicy rt (sh "echo foo") `shouldBe` Ask
 
-    it "computes policies correctly (@* shorthand)" $ do
-      let rt = testRt [("echo @*", Allow)]
+    it "computes policies correctly (anything metavar)" $ do
+      let rt = testRt [("echo @anything", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Allow
       computePolicy rt (sh "echo foo") `shouldBe` Allow
       computePolicy rt (sh "echo foo bar") `shouldBe` Allow
@@ -233,13 +238,13 @@ spec = do
       computePolicy rt' (sh "echo -x") `shouldBe` Ask
 
     it "computes policies correctly (dollar expansion)" $ do
-      let rt = testRt [("echo @arg*", Allow), ("foo", Allow)]
+      let rt = testRt [("echo @anything", Allow), ("foo", Allow)]
       computePolicy rt (sh "echo $(echo)") `shouldBe` Allow
       computePolicy rt (sh "echo $(foo)") `shouldBe` Allow
       computePolicy rt (sh "echo | echo $(foo)") `shouldBe` Allow
 
     it "computes policies correctly (dollar braced)" $ do
-      let rt = testRt [("echo @arg*", Allow), ("foo @arg", Allow), ("baz @arg", Allow)]
+      let rt = testRt [("echo @anything", Allow), ("foo @arg", Allow), ("baz @arg", Allow)]
       computePolicy rt (sh "echo $test") `shouldBe` Allow
       computePolicy rt (sh "echo '$test'") `shouldBe` Allow
       computePolicy rt (sh "echo \"$test\"") `shouldBe` Allow
