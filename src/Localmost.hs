@@ -97,9 +97,9 @@ parseRuleExcepts r =
             Right Script {sCommands = [c]} ->
               if cmdAllRedirectsCount c == 0
                 then Right $ Except ([Anything] ++ cmdParts c ++ [Anything])
-                else err ["Except clause must not contain redirections."]
+                else err ["Unless clauses must not contain redirections."]
             Right Script {sCommands = cmds} ->
-              err ["Except clause must have one command (got: " <> pack (show (length cmds)) <> ")."]
+              err ["Unless clauses must have exactly one command (got: " <> pack (show (length cmds)) <> ")."]
             Left errs -> err errs
 
 parseRule :: Policy -> ConfigRule -> Either ParseRuleError Rule
