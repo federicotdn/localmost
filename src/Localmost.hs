@@ -25,11 +25,11 @@ import Data.Text qualified as T
 import Protocol (Proto (..))
 import Shell
   ( comments,
+    constText,
     fullCommands,
     isQuoted,
     parseShellScript,
     simpleCommands,
-    tokenAsText,
   )
 import ShellCheck.AST qualified as AST
 import ShellCheck.ASTLib qualified as ASTL
@@ -54,11 +54,14 @@ import Utils (ePutStrLn, isInt)
 
 newtype Runtime = Runtime {rRules :: [Rule]} deriving (Show)
 
+newtype Except = Except [Part] deriving (Show)
+
 data Rule = Rule
   { rCommand :: Command,
     rPolicy :: Policy,
     rPipeAccess :: PipeAccess,
-    rRedirectAccess :: RedirectAccess
+    rRedirectAccess :: RedirectAccess,
+    rExcepts :: [Except]
   }
   deriving (Show)
 
@@ -81,6 +84,24 @@ instance Show ParseRuleError where
       section title items =
         "\n| " <> title <> ":" <> mconcat (map ("\n|   " <>) items)
 
+parseRuleExcepts :: ConfigRule -> Either ParseRuleError [Except]
+parseRuleExcepts r =
+  let texts = fromMaybe [] (rUnless r)
+   in mapM parseOne texts
+  where
+    parseOne t =
+      let pr = parseShellScript t
+          escript = astAsScript pr True
+          err msgs = Left ParseRuleError {preErrors = msgs, preComments = [], preRule = r}
+       in case escript of
+            Right Script {sCommands = [c]} ->
+              if cmdAllRedirectsCount c == 0
+                then Right $ Except ([Anything] ++ cmdParts c ++ [Anything])
+                else err ["Except clause must not contain redirections."]
+            Right Script {sCommands = cmds} ->
+              err ["Except clause must have one command (got: " <> pack (show (length cmds)) <> ")."]
+            Left errs -> err errs
+
 parseRule :: Policy -> ConfigRule -> Either ParseRuleError Rule
 parseRule pol r =
   let pr = parseShellScript (rRule r)
@@ -89,10 +110,11 @@ parseRule pol r =
    in case escript of
         Right Script {sCommands = [c]} ->
           if cmdAllRedirectsCount c == 0
-            then
+            then do
+              excepts <- parseRuleExcepts r
               let pa = fromMaybe All (rPipe r) -- Allow all pipes by default.
                   ra = fromMaybe Safe (rRedirect r) -- Allow safe redirects by default.
-               in Right Rule {rCommand = c, rPolicy = pol, rPipeAccess = pa, rRedirectAccess = ra}
+              Right Rule {rCommand = c, rPolicy = pol, rPipeAccess = pa, rRedirectAccess = ra, rExcepts = excepts}
             else err ["Rules must not contain redirections."]
         Right Script {sCommands = cmds} ->
           err [pack $ "Rules must contain exactly one command (got: " ++ show (length cmds) ++ ")."]
@@ -163,7 +185,7 @@ extractRedirects redirs =
         AST.T_LESSGREAT {} -> Right Write
         AST.T_Less {} -> Right Read
         _ -> Left [pack $ "Unknown redirect operator: " ++ showToken op ++ "."]
-      case tokenAsText f False of
+      case constText f False of
         Just path -> Right (StaticPath path mode)
         Nothing -> Right (DynamicPath f mode)
 
@@ -178,7 +200,7 @@ simpleCommandParts t isRule = case t of
 asMetaPart :: AST.Token -> Either Errors Part
 asMetaPart t =
   -- Parse: @foo (not quoted!)
-  let mtext = tokenAsText t True
+  let mtext = constText t True
       hasPrefix = maybe False ("@" `T.isPrefixOf`) mtext
       expr = maybe "" (T.drop 1) mtext
       parsed = R.readP_to_S parseMetaExpr (T.unpack expr)
@@ -215,7 +237,7 @@ asMetaPart t =
         -- Anything else: also take literally.
         _ -> Right (Token t')
     buildGroup inner equant = do
-      case tokenAsText inner True of
+      case constText inner True of
         Just text -> do
           case simpleCommands <$> prRoot (parseShellScript text) of
             Just [AST.T_SimpleCommand _ _ list] -> do
@@ -233,7 +255,7 @@ parseMetaExpr = do
   let meta' = case meta of
         "arg" -> Just Arg
         "int" -> Just Int
-        "anything" -> Just PAnything
+        "anything" -> Just Anything
         "@" -> Just At
         _ -> Nothing
   result <- case meta' of
@@ -242,7 +264,7 @@ parseMetaExpr = do
       if atEnd
         then pure m
         else do
-          if m == PAnything
+          if m == Anything
             then R.pfail -- Anything can't have quantifiers
             else do
               quant <- R.get
@@ -307,7 +329,34 @@ applyPolicy cmd policy = cmd {cmdPolicy = Just $ maybe policy (max policy) (cmdP
 
 commandsMatch :: Rule -> Command -> Bool
 commandsMatch rule@(Rule {rCommand = cmd}) input =
-  allPartsMatch (cmdParts cmd) (cmdParts input) && pipesMatch rule input && redirectsMatch rule input
+  allPartsMatch (cmdParts cmd) (cmdParts input)
+    && pipesMatch rule input
+    && redirectsMatch rule input
+    && not (exceptsMatch rule input)
+
+exceptsMatch :: Rule -> Command -> Bool
+exceptsMatch Rule {rExcepts = excepts} input =
+  let cmdHasNonConsts = not $ all isConst [tok | (Token tok) <- cmdParts input]
+      exceptsNeedConst = any exceptNeedsConst excepts
+   in -- If no excepts defined, nothing to match -> False.
+      -- If at least 1 except needs to compare const values, and the
+      -- command has at least one non-const value, err on the side of
+      -- caution and return True, because we can't be sure what e.g.
+      -- \$var will evaluate to, so we can't compare it to e.g. '-exec'.
+      -- Otherwise, proceed with parts matching.
+      not (null excepts) && ((exceptsNeedConst && cmdHasNonConsts) || any (`matchOne` input) excepts)
+  where
+    matchOne (Except parts) cmd = allPartsMatch parts (cmdParts cmd)
+    isConst tok = isJust $ constText tok False
+    exceptNeedsConst (Except parts) = any needsConst parts
+    needsConst t = case t of
+      Token tok -> isConst tok
+      Choice choices -> any needsConst choices
+      Group group -> any needsConst group
+      Arg -> False
+      Anything -> False
+      Quant p _ -> needsConst p
+      _ -> True
 
 pipesMatch :: Rule -> Command -> Bool
 pipesMatch Rule {rPipeAccess = pa} input = case pa of
@@ -345,7 +394,7 @@ compile parts = emit parts ++ [Accept]
     emit (Group gparts : rest) = emit gparts ++ emit rest
     emit (Quant inner c : rest) = emitQuant inner c ++ emit rest
     -- @anything is basically @arg*, but also matches splitting tokens.
-    emit (PAnything : rest) = [Fork 3, Match PAnything, Jump (-2)] ++ emit rest
+    emit (Anything : rest) = [Fork 3, Match Anything, Jump (-2)] ++ emit rest
     emit (p : rest) = Match p : emit rest
 
     emitChoice [] = []
@@ -401,14 +450,14 @@ isSplitting _ = False
 
 partMatches :: Part -> Part -> Bool
 partMatches rule input = case (rule, input) of
-  (PAnything, _) -> True
+  (Anything, _) -> True
   (Arg, _) -> (not . isSplitting) input
-  (Int, Token t) -> maybe False isInt (tokenAsText t False)
-  (At, Token t) -> tokenAsText t False == Just "@"
+  (Int, Token t) -> maybe False isInt (constText t False)
+  (At, Token t) -> constText t False == Just "@"
   (Token rt, Token it) ->
-    let rText = tokenAsText rt True
+    let rText = constText rt True
         eq = rt == it
-     in (isJust rText && rText == tokenAsText it False) || eq
+     in (isJust rText && rText == constText it False) || eq
   _ -> False
 
 check :: Proto -> IO ()

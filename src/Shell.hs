@@ -2,7 +2,7 @@ module Shell
   ( parseShellScript,
     comments,
     isQuoted,
-    tokenAsText,
+    constText,
     simpleCommands,
     fullCommands,
   )
@@ -60,15 +60,15 @@ parseShellScript script =
       spec = newParseSpec {psScript = unpack script, psShellTypeOverride = Just Bash}
    in runIdentity $ parseScript iface spec
 
-tokenAsText :: AST.Token -> Bool -> Maybe Text
-tokenAsText outer@(AST.OuterToken _ inner) static =
+constText :: AST.Token -> Bool -> Maybe Text
+constText outer@(AST.OuterToken _ inner) static =
   if static || ASTL.isConstant outer
     then case inner of
       AST.Inner_T_Literal s -> Just (pack s)
       AST.Inner_T_SingleQuoted s -> Just (pack s)
       AST.Inner_T_Glob s -> if static then Just (pack s) else Nothing
-      AST.Inner_T_NormalWord list -> mconcat <$> mapM (`tokenAsText` static) list
-      AST.Inner_T_DoubleQuoted list -> mconcat <$> mapM (`tokenAsText` static) list
+      AST.Inner_T_NormalWord list -> mconcat <$> mapM (`constText` static) list
+      AST.Inner_T_DoubleQuoted list -> mconcat <$> mapM (`constText` static) list
       _ -> Nothing
     else Nothing
 

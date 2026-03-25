@@ -19,7 +19,8 @@ import Utils (jsonOptions, tryIO)
 data ConfigRule = ConfigRule
   { rRule :: Text,
     rPipe :: Maybe PipeAccess,
-    rRedirect :: Maybe RedirectAccess
+    rRedirect :: Maybe RedirectAccess,
+    rUnless :: Maybe [Text]
   }
   deriving (Generic, Show, Eq)
 

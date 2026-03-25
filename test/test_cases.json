@@ -117,5 +117,32 @@
       {"input": "git rm", "expect": "ask"},
       {"input": "git -C . rm", "expect": "ask"}
     ]
+  },
+  {
+    "name": "excepts",
+    "config": {
+      "allow": [
+        {"rule": "echo @anything", "unless": ["x"]},
+        {"rule": "bar @anything", "unless": ["$foo"]},
+        {"rule": "bar2 @anything", "unless": ["x y", "z"]},
+        {"rule": "bar3 @anything", "unless": ["@{a,b}+"]}
+      ]
+    },
+    "cases": [
+      {"input": "echo foo", "expect": "allow"},
+      {"input": "echo x", "expect": "ask"},
+      {"input": "echo $var", "expect": "ask"},
+      {"input": "echo ${var}", "expect": "ask"},
+      {"input": "bar $foo", "expect": "ask"},
+      {"input": "bar test", "expect": "allow"},
+      {"input": "bar2 x", "expect": "allow"},
+      {"input": "bar2 x y", "expect": "ask"},
+      {"input": "bar2 x y z", "expect": "ask"},
+      {"input": "bar2 z", "expect": "ask"},
+      {"input": "bar3 x", "expect": "allow"},
+      {"input": "bar3 a", "expect": "ask"},
+      {"input": "bar3 a b", "expect": "ask"},
+      {"input": "bar3 a b a", "expect": "ask"}
+    ]
   }
 ]

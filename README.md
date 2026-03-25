@@ -1,6 +1,6 @@
 # localmost
 
-A Claude Code `PreToolUse` tool based on [ShellCheck](https://www.shellcheck.net/).
+A flexible and deterministic Claude Code `PreToolUse` tool based on [ShellCheck](https://www.shellcheck.net/).
 
 Localmost uses the [PreToolUse](https://code.claude.com/docs/en/hooks#pretooluse) hook which fires before each bash command execution attempt, and based on a `config.json` file, decides on one of three possible policies: `allow`, `ask` or `deny`.
 

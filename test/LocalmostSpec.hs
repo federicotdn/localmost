@@ -10,7 +10,7 @@ import Types (Policy (..))
 
 -- Test Rule
 tr :: ConfigRule
-tr = ConfigRule {rRule = "", rPipe = Nothing, rRedirect = Nothing}
+tr = ConfigRule {rRule = "x", rPipe = Nothing, rRedirect = Nothing, rUnless = Nothing}
 
 testRt :: [(Text, Policy)] -> Runtime
 testRt rules =
@@ -40,6 +40,20 @@ spec = do
 
     it "rejects rules with no commands" $ do
       let cfg = defaultConfig {cAllow = Just [tr {rRule = ""}]}
+      parseConfig cfg `shouldSatisfy` isLeft
+
+    it "rejects except clauses with multiple commands" $ do
+      let excepts = ["foo | bar", "foo && bar", "foo; bar"]
+      let parse e = parseConfig defaultConfig {cAllow = Just [tr {rUnless = Just [e]}]}
+      mapM_ (\e -> parse e `shouldSatisfy` isLeft) excepts
+
+    it "rejects except clauses with redirects" $ do
+      let excepts = ["foo > bar", "foo 2>&1", "foo < bar"]
+      let parse e = parseConfig defaultConfig {cAllow = Just [tr {rUnless = Just [e]}]}
+      mapM_ (\e -> parse e `shouldSatisfy` isLeft) excepts
+
+    it "rejects except clauses with no commands" $ do
+      let cfg = defaultConfig {cAllow = Just [tr {rUnless = Just [""]}]}
       parseConfig cfg `shouldSatisfy` isLeft
 
     it "rejects rules with quantifier @anything" $ do
@@ -203,6 +217,12 @@ spec = do
       computePolicy rt (sh "echo bar") `shouldBe` Allow
       computePolicy rt (sh "echo abc") `shouldBe` Ask
       computePolicy rt (sh "echo foo bar") `shouldBe` Ask
+
+    it "computes policies correctly (command choices)" $ do
+      let rt = testRt [("@{foo,bar} x", Allow)]
+      computePolicy rt (sh "echo x") `shouldBe` Ask
+      computePolicy rt (sh "foo x") `shouldBe` Allow
+      computePolicy rt (sh "bar x") `shouldBe` Allow
 
     it "computes policies correctly (choices with quant)" $ do
       let rt = testRt [("echo @{foo,bar}*", Allow)]
