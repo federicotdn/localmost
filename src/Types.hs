@@ -23,7 +23,7 @@ import Data.Aeson
     parseJSON,
     toJSON,
   )
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 import ShellCheck.AST qualified as AST
 import Utils (jsonOptions)
@@ -69,6 +69,7 @@ data Count = Count Int (Maybe Int) deriving (Eq)
 
 data Part
   = Token AST.Token
+  | Literal Text
   | Choice [Part]
   | Group [Part]
   | Arg
@@ -84,6 +85,7 @@ instance Show Count where
 
 instance Show Part where
   show (Token t) = "Token (" ++ show (AST.getId t) ++ ") (" ++ showToken t ++ ")"
+  show (Literal t) = unpack $ "Literal " <> t
   show (Choice list) = "Choice " ++ show list
   show (Group list) = "Group " ++ show list
   show Arg = "Arg"

@@ -81,6 +81,9 @@ instance Show ParseRuleError where
       section title items =
         "\n| " <> title <> ":" <> mconcat (map ("\n|   " <>) items)
 
+defaultPolicy :: Policy
+defaultPolicy = Ask
+
 parseRuleExcepts :: ConfigRule -> Either ParseRuleError [Except]
 parseRuleExcepts r =
   let texts = fromMaybe [] (rUnless r)
@@ -192,8 +195,13 @@ simpleCommandParts t isRule = case t of
   AST.T_SimpleCommand _ _ list ->
     if isRule
       then mapM asMetaPart list
-      else Right (map Token list)
+      else Right (map asLiteralPart list)
   _ -> unexpectedToken t
+
+asLiteralPart :: AST.Token -> Part
+asLiteralPart token = case literalText token False of
+  Just text -> Literal text
+  Nothing -> Token token
 
 asMetaPart :: AST.Token -> Either Errors Part
 asMetaPart t =
@@ -240,9 +248,9 @@ asMetaPart t =
           (AST.T_Literal _ "@") : _ ->
             Left ["Unknown meta var @."]
           -- Anything else: take literally.
-          _ -> Right (Token t')
+          _ -> Right $ asLiteralPart t'
         -- Anything else: also take literally.
-        _ -> Right (Token t')
+        _ -> Right $ asLiteralPart t'
     buildGroup inner equant = do
       case literalText inner True of
         Just text -> do
@@ -301,15 +309,22 @@ parseQuantifier s part = case s of
 -- and a script, decides on a policy. Note the function does not depend on
 -- IO as all IO is done from other functions.
 computePolicy :: Runtime -> Script -> Policy
-computePolicy rt input =
+computePolicy rt input@(Script {sCommands = cmds}) =
   let rules = rRules rt
       input' = applyRules rules input
-   in fromMaybe Ask (scriptPolicy input')
+      -- We only work on purely literal input commands, i.e. no variables,
+      -- arithmetic, brace expansion, etc.
+      allLiteral = all cmdIsLiteral cmds
+   in if allLiteral
+        then fromMaybe defaultPolicy (scriptPolicy input')
+        else defaultPolicy
+  where
+    cmdIsLiteral Command {cmdParts = parts} =
+      length [() | (Literal _) <- parts] == length parts
 
 scriptPolicy :: Script -> Maybe Policy
-scriptPolicy script =
-  let cmds = sCommands script
-      policies = mapMaybe cmdPolicy cmds
+scriptPolicy Script {sCommands = cmds} =
+  let policies = mapMaybe cmdPolicy cmds
    in if length cmds == length policies
         then Just $ maximum policies
         else Nothing
@@ -432,18 +447,18 @@ execute instrs = go (IntSet.singleton 0)
 
 partMatches :: Part -> Part -> Bool
 partMatches rule input = case input of
-  Token t ->
-    case literalText t False of
-      Just inputText -> case rule of
-        Arg -> True
-        Int -> isInt inputText
-        At -> inputText == "@"
-        Path -> isValid $ unpack inputText
-        Token rt ->
-          let rText = literalText rt True
-           in rText == Just inputText
-        _ -> False
-      Nothing -> False
+  Literal inputText ->
+    case rule of
+      Arg -> True
+      Int -> isInt inputText
+      At -> inputText == "@"
+      Path -> isValid $ unpack inputText
+      Literal ruleText -> ruleText == inputText
+      -- Should not happen as all rule parts are
+      -- either meta vars, or literals.
+      _ -> False
+  -- Should not happen as all input commands parts
+  -- are exclusively literals.
   _ -> False
 
 check :: Proto -> IO ()
