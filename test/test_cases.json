@@ -92,7 +92,7 @@
   {
     "name": "nested evil command",
     "config": {
-      "allow": [{"rule": "echo @anything"}]
+      "allow": [{"rule": "echo @arg*"}]
     },
     "cases": [
       {"input": "for d in /tmp/*; do echo \"$(evil $d)\"; ls \"$d\"; echo; done", "expect": "ask"},
@@ -106,12 +106,12 @@
   {
     "name": "git",
     "config": {
-      "allow": [{"rule": "git @(-C @arg)? @{log,status,diff,show,blame} @anything"}]
+      "allow": [{"rule": "git @(-C @arg)? @{log,status,diff,show,blame} @arg*"}]
     },
     "cases": [
       {"input": "git log", "expect": "allow"},
       {"input": "git log mybranch", "expect": "allow"},
-      {"input": "git log $mybranch", "expect": "allow"},
+      {"input": "git log $mybranch", "expect": "ask"},
       {"input": "git log $(get-branch-name)", "expect": "ask"},
       {"input": "git -C . log", "expect": "allow"},
       {"input": "git rm", "expect": "ask"},
@@ -122,10 +122,10 @@
     "name": "excepts",
     "config": {
       "allow": [
-        {"rule": "echo @anything", "unless": ["x"]},
-        {"rule": "bar @anything", "unless": ["$foo"]},
-        {"rule": "bar2 @anything", "unless": ["x y", "z"]},
-        {"rule": "bar3 @anything", "unless": ["@{a,b}+"]}
+        {"rule": "echo @arg*", "unless": ["x"]},
+        {"rule": "bar @arg*", "unless": ["$foo"]},
+        {"rule": "bar2 @arg*", "unless": ["x y", "z"]},
+        {"rule": "bar3 @arg*", "unless": ["@{a,b}+"]}
       ]
     },
     "cases": [

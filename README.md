@@ -32,3 +32,7 @@ This will instruct Claude Code to use localmost to decide on bash command execut
 ## Configuration
 
 ...
+
+## Tips
+
+- Since localmost is an external process, you don't need to reload your (e.g. Claude Code) session in order for any configuration changes to be picked up.

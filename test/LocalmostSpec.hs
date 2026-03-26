@@ -56,8 +56,13 @@ spec = do
       let cfg = defaultConfig {cAllow = Just [tr {rUnless = Just [""]}]}
       parseConfig cfg `shouldSatisfy` isLeft
 
-    it "rejects rules with quantifier @anything" $ do
-      let rules = ["foo @anything+", "foo @anything?", "foo @anything*"]
+    it "rejects rules with double quantifiers" $ do
+      let rules = ["foo @**", "foo @*+", "foo @*?"]
+      let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
+      mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
+
+    it "rejects rules with 1-element choices" $ do
+      let rules = ["foo @{test}"]
       let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
       mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
 
@@ -142,19 +147,6 @@ spec = do
       computePolicy rt (sh "echo \"${arr[@]}\"") `shouldBe` Ask
       computePolicy rt (sh "echo !(*.a)") `shouldBe` Ask
 
-    it "computes policies correctly (match arbitrary token)" $ do
-      let rt = testRt [("echo $foo", Allow)]
-      computePolicy rt (sh "echo") `shouldBe` Ask
-      computePolicy rt (sh "echo $foo") `shouldBe` Allow
-      computePolicy rt (sh "echo '$foo'") `shouldBe` Ask
-      computePolicy rt (sh "echo \"$foo\"") `shouldBe` Ask
-      let rt' = testRt [("echo ${foo:-bar}", Allow)]
-      computePolicy rt' (sh "echo $foo") `shouldBe` Ask
-      computePolicy rt' (sh "echo bar") `shouldBe` Ask
-      computePolicy rt' (sh "echo ${foo}") `shouldBe` Ask
-      computePolicy rt' (sh "echo ${foo:-b}") `shouldBe` Ask
-      computePolicy rt' (sh "echo ${foo:-bar}") `shouldBe` Allow
-
     it "computes policies correctly (int metavar)" $ do
       let rt = testRt [("echo @int", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Ask
@@ -170,6 +162,15 @@ spec = do
       computePolicy rt (sh "echo") `shouldBe` Ask
       computePolicy rt (sh "echo foo") `shouldBe` Ask
       computePolicy rt (sh "echo @") `shouldBe` Allow
+
+    it "computes policies correctly (path metavar)" $ do
+      let rt = testRt [("echo @path", Allow)]
+      computePolicy rt (sh "echo foo") `shouldBe` Allow
+      computePolicy rt (sh "echo /foo") `shouldBe` Allow
+      computePolicy rt (sh "echo /../foo") `shouldBe` Allow
+      computePolicy rt (sh "echo .foo") `shouldBe` Allow
+      computePolicy rt (sh "echo /foo/bar") `shouldBe` Allow
+      computePolicy rt (sh "echo /foo/\0bar") `shouldBe` Ask
 
     it "computes policies correctly (arg metavar with quant +)" $ do
       let rt = testRt [("echo @arg+", Allow)]
@@ -190,6 +191,12 @@ spec = do
       computePolicy rt' (sh "echo foo bar") `shouldBe` Allow
       computePolicy rt' (sh "echo foo foo2 bar") `shouldBe` Allow
 
+    it "computes policies correctly (@* metavar)" $ do
+      let rt = testRt [("echo @*", Allow)]
+      computePolicy rt (sh "echo") `shouldBe` Allow
+      computePolicy rt (sh "echo foo") `shouldBe` Allow
+      computePolicy rt (sh "echo foo bar") `shouldBe` Allow
+
     it "computes policies correctly (arg metavar with quant ?)" $ do
       let rt = testRt [("echo @arg?", Allow)]
       computePolicy rt (sh "echo") `shouldBe` Allow
@@ -202,13 +209,6 @@ spec = do
       computePolicy rt (sh "echo foo done") `shouldBe` Allow
       computePolicy rt (sh "echo foo bar done") `shouldBe` Allow
       computePolicy rt (sh "echo foo") `shouldBe` Ask
-
-    it "computes policies correctly (anything metavar)" $ do
-      let rt = testRt [("echo @anything", Allow)]
-      computePolicy rt (sh "echo") `shouldBe` Allow
-      computePolicy rt (sh "echo foo") `shouldBe` Allow
-      computePolicy rt (sh "echo foo bar") `shouldBe` Allow
-      computePolicy rt (sh "ls") `shouldBe` Ask
 
     it "computes policies correctly (choices)" $ do
       let rt = testRt [("echo @{foo,bar}", Allow)]
@@ -264,22 +264,6 @@ spec = do
       computePolicy rt' (sh "echo") `shouldBe` Ask
       computePolicy rt' (sh "echo @arg") `shouldBe` Allow
       computePolicy rt' (sh "echo -x") `shouldBe` Ask
-
-    it "computes policies correctly (dollar expansion)" $ do
-      let rt = testRt [("echo @anything", Allow), ("foo", Allow)]
-      computePolicy rt (sh "echo $(echo)") `shouldBe` Allow
-      computePolicy rt (sh "echo $(foo)") `shouldBe` Allow
-      computePolicy rt (sh "echo | echo $(foo)") `shouldBe` Allow
-
-    it "computes policies correctly (dollar braced)" $ do
-      let rt = testRt [("echo @anything", Allow), ("foo @arg", Allow), ("baz @arg", Allow)]
-      computePolicy rt (sh "echo $test") `shouldBe` Allow
-      computePolicy rt (sh "echo '$test'") `shouldBe` Allow
-      computePolicy rt (sh "echo \"$test\"") `shouldBe` Allow
-      computePolicy rt (sh "foo $test") `shouldBe` Ask
-      computePolicy rt (sh "foo $test $test") `shouldBe` Ask
-      computePolicy rt (sh "baz $test") `shouldBe` Ask
-      computePolicy rt (sh "baz $test $test") `shouldBe` Ask
 
     it "computes policies correctly (source command)" $ do
       let rt = testRt [("source @arg", Allow)]

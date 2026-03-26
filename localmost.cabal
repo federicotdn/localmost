@@ -39,6 +39,7 @@ library
                     , containers
                     , directory
                     , filepath
+                    , parsec
                     , transformers
 
 executable localmost

@@ -25,18 +25,19 @@ import Data.Text qualified as T
 import Protocol (Proto (..))
 import Shell
   ( comments,
-    constText,
     fullCommands,
     isQuoted,
+    literalText,
     parseShellScript,
     simpleCommands,
   )
 import ShellCheck.AST qualified as AST
-import ShellCheck.ASTLib qualified as ASTL
 import ShellCheck.Interface (ParseResult (..))
 import System.Exit (exitFailure)
-import Text.ParserCombinators.ReadP (ReadP)
-import Text.ParserCombinators.ReadP qualified as R
+import System.FilePath (isValid)
+import Text.Parsec (Parsec)
+import Text.Parsec qualified as P
+import Text.Parsec.Error qualified as P
 import Types
   ( Command (..),
     Count (..),
@@ -93,10 +94,11 @@ parseRuleExcepts r =
       let pr = parseShellScript t
           escript = astAsScript pr True
           err msgs = Left ParseRuleError {preErrors = msgs, preComments = [], preRule = r}
+          anything = Quant Arg (Count 0 Nothing)
        in case escript of
             Right Script {sCommands = [c]} ->
               if cmdAllRedirectsCount c == 0
-                then Right $ Except ([Anything] ++ cmdParts c ++ [Anything])
+                then Right $ Except ([anything] ++ cmdParts c ++ [anything])
                 else err ["Unless clauses must not contain redirections."]
             Right Script {sCommands = cmds} ->
               err ["Unless clauses must have exactly one command (got: " <> pack (show (length cmds)) <> ")."]
@@ -185,7 +187,7 @@ extractRedirects redirs =
         AST.T_LESSGREAT {} -> Right Write
         AST.T_Less {} -> Right Read
         _ -> Left [pack $ "Unknown redirect operator: " ++ showToken op ++ "."]
-      case constText f False of
+      case literalText f False of
         Just path -> Right (StaticPath path mode)
         Nothing -> Right (DynamicPath f mode)
 
@@ -200,15 +202,19 @@ simpleCommandParts t isRule = case t of
 asMetaPart :: AST.Token -> Either Errors Part
 asMetaPart t =
   -- Parse: @foo (not quoted!)
-  let mtext = constText t True
+  let mtext = literalText t True
       hasPrefix = maybe False ("@" `T.isPrefixOf`) mtext
+      -- Avoid parsing here single-element groups e.g. @{x}
+      isChoice = maybe False ("@{" `T.isPrefixOf`) mtext
       expr = maybe "" (T.drop 1) mtext
-      parsed = R.readP_to_S parseMetaExpr (T.unpack expr)
+      parsed = P.parse parseMetaExpr "" (T.unpack expr)
       quoted = isQuoted t
-   in if hasPrefix && not quoted
+   in if hasPrefix && not quoted && not isChoice
         then case parsed of
-          (r : _) -> Right (fst r)
-          _ -> Left ["Unknown meta var: " <> fromMaybe "" mtext <> "."]
+          Right r -> Right r
+          Left err ->
+            let msgs = [pack s | P.Message s <- P.errorMessages err, not (null s)]
+             in Left $ if null msgs then ["Unknown meta var: " <> fromMaybe "" mtext <> "."] else msgs
         else asMetaPartNonText t
   where
     asMetaPartNonText t' =
@@ -232,12 +238,17 @@ asMetaPart t =
           -- Parse: @(...)+
           [AST.T_Extglob _ "@" [inner], AST.T_Literal _ s] ->
             buildGroup inner $ Just s
+          -- Do some extra validation.
+          (AST.T_Literal _ "@") : (AST.T_Literal _ "{") : _ ->
+            Left ["Choice expressions @{...} must contain 2 or more elements."]
+          (AST.T_Literal _ "@") : _ ->
+            Left ["Unknown meta var @."]
           -- Anything else: take literally.
           _ -> Right (Token t')
         -- Anything else: also take literally.
         _ -> Right (Token t')
     buildGroup inner equant = do
-      case constText inner True of
+      case literalText inner True of
         Just text -> do
           case simpleCommands <$> prRoot (parseShellScript text) of
             Just [AST.T_SimpleCommand _ _ list] -> do
@@ -249,31 +260,28 @@ asMetaPart t =
       choice <- Choice <$> mapM asMetaPart items
       maybeQuantWrap choice equant
 
-parseMetaExpr :: ReadP Part
+parseMetaExpr :: Parsec String () Part
 parseMetaExpr = do
-  meta <- R.choice $ map R.string ["arg", "int", "anything", "@"]
+  meta <- P.choice $ map P.try [P.string "arg", P.string "int", P.string "path", P.string "@", P.string "*"]
   let meta' = case meta of
         "arg" -> Just Arg
         "int" -> Just Int
-        "anything" -> Just Anything
+        "path" -> Just Path
         "@" -> Just At
+        "*" -> Just $ Quant Arg (Count 0 Nothing) -- @* shortcut.
         _ -> Nothing
   result <- case meta' of
+    Just m@(Quant _ _) -> pure m
     Just m -> do
-      atEnd <- null <$> R.look
-      if atEnd
-        then pure m
-        else do
-          if m == Anything
-            then R.pfail -- Anything can't have quantifiers
-            else do
-              quant <- R.get
-              let ewrapped = parseQuantifier [quant] m
-              case ewrapped of
-                Just wrapped -> pure wrapped
-                _ -> R.pfail
-    Nothing -> R.pfail
-  R.eof
+      atEnd <- P.optionMaybe P.anyChar
+      case atEnd of
+        Nothing -> pure m
+        Just quant ->
+          case parseQuantifier [quant] m of
+            Just wrapped -> pure wrapped
+            _ -> fail $ "Unknown quantifier '" ++ [quant] ++ "'."
+    Nothing -> fail "Unknown meta var."
+  P.eof
   pure result
 
 maybeQuantWrap :: Part -> Maybe String -> Either [Text] Part
@@ -336,27 +344,11 @@ commandsMatch rule@(Rule {rCommand = cmd}) input =
 
 exceptsMatch :: Rule -> Command -> Bool
 exceptsMatch Rule {rExcepts = excepts} input =
-  let cmdHasNonConsts = not $ all isConst [tok | (Token tok) <- cmdParts input]
-      exceptsNeedConst = any exceptNeedsConst excepts
-   in -- If no excepts defined, nothing to match -> False.
-      -- If at least 1 except needs to compare const values, and the
-      -- command has at least one non-const value, err on the side of
-      -- caution and return True, because we can't be sure what e.g.
-      -- \$var will evaluate to, so we can't compare it to e.g. '-exec'.
-      -- Otherwise, proceed with parts matching.
-      not (null excepts) && ((exceptsNeedConst && cmdHasNonConsts) || any (`matchOne` input) excepts)
+  let cmdHasNonConsts = not $ all isLiteral [tok | (Token tok) <- cmdParts input]
+   in not (null excepts) && (cmdHasNonConsts || any (`matchOne` input) excepts)
   where
     matchOne (Except parts) cmd = allPartsMatch parts (cmdParts cmd)
-    isConst tok = isJust $ constText tok False
-    exceptNeedsConst (Except parts) = any needsConst parts
-    needsConst t = case t of
-      Token tok -> isConst tok
-      Choice choices -> any needsConst choices
-      Group group -> any needsConst group
-      Arg -> False
-      Anything -> False
-      Quant p _ -> needsConst p
-      _ -> True
+    isLiteral tok = isJust $ literalText tok False
 
 pipesMatch :: Rule -> Command -> Bool
 pipesMatch Rule {rPipeAccess = pa} input = case pa of
@@ -393,8 +385,6 @@ compile parts = emit parts ++ [Accept]
     emit (Choice alts : rest) = emitChoice alts ++ emit rest
     emit (Group gparts : rest) = emit gparts ++ emit rest
     emit (Quant inner c : rest) = emitQuant inner c ++ emit rest
-    -- @anything is basically @arg*, but also matches splitting tokens.
-    emit (Anything : rest) = [Fork 3, Match Anything, Jump (-2)] ++ emit rest
     emit (p : rest) = Match p : emit rest
 
     emitChoice [] = []
@@ -444,20 +434,20 @@ execute instrs = go (IntSet.singleton 0)
       Just (Match p) -> [pc + 1 | partMatches p tok]
       _ -> []
 
-isSplitting :: Part -> Bool
-isSplitting (Token t@(AST.T_NormalWord _ _)) = ASTL.willSplit t
-isSplitting _ = False
-
 partMatches :: Part -> Part -> Bool
-partMatches rule input = case (rule, input) of
-  (Anything, _) -> True
-  (Arg, _) -> (not . isSplitting) input
-  (Int, Token t) -> maybe False isInt (constText t False)
-  (At, Token t) -> constText t False == Just "@"
-  (Token rt, Token it) ->
-    let rText = constText rt True
-        eq = rt == it
-     in (isJust rText && rText == constText it False) || eq
+partMatches rule input = case input of
+  Token t ->
+    case literalText t False of
+      Just inputText -> case rule of
+        Arg -> True
+        Int -> isInt inputText
+        At -> inputText == "@"
+        Path -> isValid $ unpack inputText
+        Token rt ->
+          let rText = literalText rt True
+           in rText == Just inputText
+        _ -> False
+      Nothing -> False
   _ -> False
 
 check :: Proto -> IO ()
