@@ -123,7 +123,6 @@
     "config": {
       "allow": [
         {"rule": "echo @arg*", "unless": ["x"]},
-        {"rule": "bar @arg*", "unless": ["$foo"]},
         {"rule": "bar2 @arg*", "unless": ["x y", "z"]},
         {"rule": "bar3 @arg*", "unless": ["@{a,b}+"]}
       ]
@@ -133,8 +132,6 @@
       {"input": "echo x", "expect": "ask"},
       {"input": "echo $var", "expect": "ask"},
       {"input": "echo ${var}", "expect": "ask"},
-      {"input": "bar $foo", "expect": "ask"},
-      {"input": "bar test", "expect": "allow"},
       {"input": "bar2 x", "expect": "allow"},
       {"input": "bar2 x y", "expect": "ask"},
       {"input": "bar2 x y z", "expect": "ask"},

@@ -21,7 +21,7 @@ import Data.Either (partitionEithers)
 import Data.Foldable (for_)
 import Data.IntSet qualified as IntSet
 import Data.List (elemIndex)
-import Data.Maybe (fromMaybe, isJust, isNothing, mapMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
 import Protocol (Proto (..))
@@ -143,11 +143,14 @@ parseSingleCommand :: Text -> String -> ConfigRule -> (Command -> Either ParseRu
 parseSingleCommand text label r onSuccess =
   let pr = parseShellScript text
       escript = astAsScript pr True
+      cmdToken c = listToMaybe [t | (Token t) <- cmdParts c]
       err msgs = Left ParseRuleError {preErrors = msgs, preComments = comments pr, preRule = r}
    in case escript of
         Right Script {sCommands = [c]} ->
           if cmdAllRedirectsCount c == 0
-            then onSuccess c
+            then case cmdToken c of
+              Just _ -> err [pack $ label ++ " must not contain unsupported bash expressions (e.g. $var)."]
+              Nothing -> onSuccess c
             else err [pack $ label ++ " must not contain redirections."]
         Right Script {sCommands = cmds} ->
           err [pack $ label ++ " must contain exactly one command (got: " ++ show (length cmds) ++ ")."]
@@ -294,9 +297,9 @@ asMetaPart t =
             Left ["Choice expressions @{...} must contain 2 or more elements."]
           (AST.T_Literal _ "@") : _ ->
             Left ["Unknown meta var @."]
-          -- Anything else: take literally.
+          -- Anything else: try to take as text, or as raw Token.
           _ -> Right $ asLiteralPart t'
-        -- Anything else: also take literally.
+        -- Same.
         _ -> Right $ asLiteralPart t'
     buildGroup inner equant = do
       case literalText inner True of

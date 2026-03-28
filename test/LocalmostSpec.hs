@@ -61,6 +61,11 @@ spec = do
       let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
       mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
 
+    it "rejects rules with unsupported bash expressions" $ do
+      let rules = ["foo $var", "foo ${test:-test}", "foo one{two,three}"]
+      let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
+      mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
+
     it "rejects rules with 1-element choices" $ do
       let rules = ["foo @{test}"]
       let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
