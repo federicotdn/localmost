@@ -9,7 +9,6 @@ import Data.Either (fromRight)
 import Data.Text (Text)
 import Localmost
 import Shell
-import Types
 
 right :: (Show a, Show b) => Either a b -> b
 right e = fromRight (error $ "expected Right, got " ++ show e) e

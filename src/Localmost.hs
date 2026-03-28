@@ -6,11 +6,17 @@ module Localmost
     computePolicy,
     astAsScript,
     Runtime (..),
+    Command (..),
+    Script (..),
+    Part (..),
+    Count (..),
+    RedirectMode (..),
+    Redirect (..),
   )
 where
 
 import Config (Config (..), ConfigRule (..), configPath, loadConfig)
-import Control.Monad (when)
+import Control.Monad (void, when)
 import Data.Either (partitionEithers)
 import Data.Foldable (for_)
 import Data.IntSet qualified as IntSet
@@ -35,21 +41,62 @@ import Text.Parsec (Parsec)
 import Text.Parsec qualified as P
 import Text.Parsec.Error qualified as P
 import Types
-  ( Command (..),
-    Count (..),
-    Errors,
-    Part (..),
+  ( Errors,
     PipeAccess (..),
     Policy (..),
-    Redirect (..),
     RedirectAccess (..),
-    RedirectMode (..),
-    Script (..),
-    showToken,
   )
 import Utils (ePutStrLn, isInt)
 
-newtype Runtime = Runtime {rRules :: [Rule]} deriving (Show)
+data RedirectMode = Read | Write deriving (Show, Eq)
+
+data Redirect
+  = StaticPath Text RedirectMode
+  | DynamicPath AST.Token RedirectMode
+  deriving (Show, Eq)
+
+data Count = Count Int (Maybe Int) deriving (Eq)
+
+instance Show Count where
+  show (Count mn Nothing) = "Count " ++ show mn ++ " *"
+  show (Count mn (Just mx)) = "Count " ++ show mn ++ " " ++ show mx
+
+data Part
+  = Token AST.Token
+  | Literal Text
+  | Choice [Part]
+  | Group [Part]
+  | Arg
+  | Int
+  | At
+  | Path
+  | Quant Part Count
+  deriving (Eq)
+
+instance Show Part where
+  show (Token t) = "Token (" ++ show (AST.getId t) ++ ") (" ++ showToken t ++ ")"
+  show (Literal t) = unpack $ "Literal " <> t
+  show (Choice list) = "Choice " ++ show list
+  show (Group list) = "Group " ++ show list
+  show Arg = "Arg"
+  show Int = "Int"
+  show At = "At"
+  show Path = "Path"
+  show (Quant p c) = "Quant " ++ show p ++ " " ++ show c
+
+data Command = Command
+  { cmdParts :: [Part],
+    cmdPolicy :: Maybe Policy, -- Only used for input commands, not rules.
+    cmdPipeIn :: Bool,
+    cmdPipeOut :: Bool,
+    -- Counts all redirections.
+    cmdAllRedirectsCount :: Int,
+    -- Redirections to files only.
+    cmdRedirects :: [Redirect]
+  }
+  deriving (Show, Eq)
+
+newtype Script = Script {sCommands :: [Command]} deriving (Show, Eq)
 
 newtype Except = Except [Part] deriving (Show)
 
@@ -80,6 +127,14 @@ instance Show ParseRuleError where
       section _ [] = ""
       section title items =
         "\n| " <> title <> ":" <> mconcat (map ("\n|   " <>) items)
+
+newtype Runtime = Runtime {rRules :: [Rule]} deriving (Show)
+
+showToken :: AST.Token -> String
+showToken (AST.OuterToken _ inner) =
+  case words (show (void inner)) of
+    (name : _) -> name
+    [] -> "<Unknown>"
 
 defaultPolicy :: Policy
 defaultPolicy = Ask

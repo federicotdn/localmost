@@ -6,7 +6,7 @@ import Data.Text (Text)
 import Localmost
 import Test.Hspec
 import TestUtils (right, sh)
-import Types
+import Types (Policy (..))
 
 -- Test Rule
 tr :: ConfigRule
