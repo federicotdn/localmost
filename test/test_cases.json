@@ -141,5 +141,49 @@
       {"input": "bar3 a b", "expect": "ask"},
       {"input": "bar3 a b a", "expect": "ask"}
     ]
+  },
+  {
+    "name": "flags",
+    "config": {
+      "allow": [
+        {"rule": "c1 @arg*", "unless": ["-x"]},
+        {"rule": "c2 @arg*", "unless": ["-foo"]},
+        {"rule": "c3 @arg*", "unless": ["--bar"]},
+        {"rule": "c4 @arg*"},
+        {"rule": "c5 @arg* -x"}
+      ],
+      "deny": [
+        {"rule": "c4 @arg* -x"}
+      ]
+    },
+    "cases": [
+      {"input": "c1 -", "expect": "allow"},
+      {"input": "c1 --", "expect": "allow"},
+      {"input": "c1 -x", "expect": "ask"},
+      {"input": "c1 --x", "expect": "ask"},
+      {"input": "c1 -xyz", "expect": "ask"},
+      {"input": "c1 -xyz=123", "expect": "ask"},
+      {"input": "c1 -xyz=", "expect": "ask"},
+      {"input": "c1 -xyz 123", "expect": "ask"},
+      {"input": "c1 -z", "expect": "allow"},
+      {"input": "c2 -foo", "expect": "ask"},
+      {"input": "c2 --foo", "expect": "ask"},
+      {"input": "c2 --foo=123", "expect": "ask"},
+      {"input": "c2 --foo=", "expect": "ask"},
+      {"input": "c2 --foo 123", "expect": "ask"},
+      {"input": "c2 -f", "expect": "allow"},
+      {"input": "c2 -o", "expect": "allow"},
+      {"input": "c3 --test", "expect": "allow"},
+      {"input": "c3 --bar", "expect": "ask"},
+      {"input": "c3 -bar", "expect": "ask"},
+      {"input": "c3 -b", "expect": "allow"},
+      {"input": "c4", "expect": "allow"},
+      {"input": "c4 -x", "expect": "deny"},
+      {"input": "c4 -xyz", "expect": "deny"},
+      {"input": "c4 --xyz", "expect": "allow"},
+      {"input": "c5 -x", "expect": "allow"},
+      {"input": "c5 -xyz", "expect": "ask"},
+      {"input": "c5 --xyz", "expect": "ask"}
+    ]
   }
 ]

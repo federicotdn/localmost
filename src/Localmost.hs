@@ -130,6 +130,8 @@ instance Show ParseRuleError where
 
 newtype Runtime = Runtime {rRules :: [Rule]} deriving (Show)
 
+data Mode = Strict | Flexible
+
 showToken :: AST.Token -> String
 showToken (AST.OuterToken _ inner) =
   case words (show (void inner)) of
@@ -398,17 +400,18 @@ applyPolicy cmd policy = cmd {cmdPolicy = Just $ maybe policy (max policy) (cmdP
 
 commandsMatch :: Rule -> Command -> Bool
 commandsMatch rule@(Rule {rCommand = cmd}) input =
-  allPartsMatch (cmdParts cmd) (cmdParts input)
-    && pipesMatch rule input
-    && redirectsMatch rule input
-    && not (exceptsMatch rule input)
+  let mode = if rPolicy rule == Allow then Strict else Flexible
+   in allPartsMatch (cmdParts cmd) (cmdParts input) mode
+        && pipesMatch rule input
+        && redirectsMatch rule input
+        && not (exceptsMatch rule input)
 
 exceptsMatch :: Rule -> Command -> Bool
 exceptsMatch Rule {rExcepts = excepts} input =
   let cmdHasNonConsts = not $ all isLiteral [tok | (Token tok) <- cmdParts input]
    in not (null excepts) && (cmdHasNonConsts || any (`matchOne` input) excepts)
   where
-    matchOne (Except parts) cmd = allPartsMatch parts (cmdParts cmd)
+    matchOne (Except parts) cmd = allPartsMatch parts (cmdParts cmd) Flexible
     isLiteral tok = isJust $ literalText tok False
 
 pipesMatch :: Rule -> Command -> Bool
@@ -434,7 +437,7 @@ redirectsMatch Rule {rRedirectAccess = ra} input = case ra of
         StaticPath "/dev/random" Read
       ]
 
-allPartsMatch :: [Part] -> [Part] -> Bool
+allPartsMatch :: [Part] -> [Part] -> Mode -> Bool
 allPartsMatch rparts = execute (compile rparts)
 
 data Instr = Match Part | Fork Int | Jump Int | Accept deriving (Show, Eq)
@@ -469,8 +472,8 @@ compile parts = emit parts ++ [Accept]
                      in Fork (blen + 1 + length rest) : body ++ rest
                in mandatory ++ opt remaining
 
-execute :: [Instr] -> [Part] -> Bool
-execute instrs = go (IntSet.singleton 0)
+execute :: [Instr] -> [Part] -> Mode -> Bool
+execute instrs iparts mode = go (IntSet.singleton 0) iparts
   where
     go states [] = any isAccepted $ IntSet.toList (advance states)
     go states (tok : rest) =
@@ -492,24 +495,52 @@ execute instrs = go (IntSet.singleton 0)
 
     -- Try consuming one token at a given state
     step tok pc = case instrAt pc of
-      Just (Match p) -> [pc + 1 | partMatches p tok]
+      Just (Match p) -> [pc + 1 | partMatches p tok mode]
       _ -> []
 
-partMatches :: Part -> Part -> Bool
-partMatches rule input = case input of
+partMatches :: Part -> Part -> Mode -> Bool
+partMatches rule input mode = case input of
   Literal inputText ->
     case rule of
       Arg -> True
       Int -> isInt inputText
       At -> inputText == "@"
       Path -> isValid $ unpack inputText
-      Literal ruleText -> ruleText == inputText
+      Literal ruleText -> textMatches ruleText inputText mode
       -- Should not happen as all rule parts are
       -- either meta vars, or literals.
       _ -> False
   -- Should not happen as all input commands parts
   -- are exclusively literals.
   _ -> False
+
+textMatches :: Text -> Text -> Mode -> Bool
+textMatches rule input mode =
+  case mode of
+    Strict -> rule == input
+    Flexible ->
+      let rf = take 1 (flags rule)
+          inf = flags input
+       in if null rf && null inf
+            then rule == input
+            else any (`elem` inf) rf
+  where
+    -- Flexible mode: try to extract all flags from input command.
+    -- We do this pessimistically: e.g. we assume that -xyz is
+    -- both -xyz itself but also -x -y -z. If the user has only
+    -- denied e.g. -y, and the input was -xyz, then this will
+    -- lead to a false positive (denying when we shouldn't), but
+    -- that is better than a false negative (not denying when we
+    -- should have). Worst case scenario, the policy ends up being
+    -- Ask.
+    -- Flags like --foo are treated as-is.
+    flags text
+      | text == "-" || text == "--" = [] -- Do not treat these as flags.
+      | "--" `T.isPrefixOf` text = [T.takeWhile (/= '=') $ T.drop 2 text]
+      | "-" `T.isPrefixOf` text =
+          let flag = T.takeWhile (/= '=') $ T.drop 1 text
+           in flag : map T.singleton (T.unpack flag)
+      | otherwise = []
 
 check :: Proto -> IO ()
 check proto = do
