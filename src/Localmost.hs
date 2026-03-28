@@ -139,42 +139,34 @@ showToken (AST.OuterToken _ inner) =
 defaultPolicy :: Policy
 defaultPolicy = Ask
 
-parseRuleExcepts :: ConfigRule -> Either ParseRuleError [Except]
-parseRuleExcepts r =
-  let texts = fromMaybe [] (rUnless r)
-   in mapM parseOne texts
-  where
-    parseOne t =
-      let pr = parseShellScript t
-          escript = astAsScript pr True
-          err msgs = Left ParseRuleError {preErrors = msgs, preComments = [], preRule = r}
-          anything = Quant Arg (Count 0 Nothing)
-       in case escript of
-            Right Script {sCommands = [c]} ->
-              if cmdAllRedirectsCount c == 0
-                then Right $ Except ([anything] ++ cmdParts c ++ [anything])
-                else err ["Unless clauses must not contain redirections."]
-            Right Script {sCommands = cmds} ->
-              err ["Unless clauses must have exactly one command (got: " <> pack (show (length cmds)) <> ")."]
-            Left errs -> err errs
-
-parseRule :: Policy -> ConfigRule -> Either ParseRuleError Rule
-parseRule pol r =
-  let pr = parseShellScript (rRule r)
+parseSingleCommand :: Text -> String -> ConfigRule -> (Command -> Either ParseRuleError a) -> Either ParseRuleError a
+parseSingleCommand text label r onSuccess =
+  let pr = parseShellScript text
       escript = astAsScript pr True
       err msgs = Left ParseRuleError {preErrors = msgs, preComments = comments pr, preRule = r}
    in case escript of
         Right Script {sCommands = [c]} ->
           if cmdAllRedirectsCount c == 0
-            then do
-              excepts <- parseRuleExcepts r
-              let pa = fromMaybe All (rPipe r) -- Allow all pipes by default.
-                  ra = fromMaybe Safe (rRedirect r) -- Allow safe redirects by default.
-              Right Rule {rCommand = c, rPolicy = pol, rPipeAccess = pa, rRedirectAccess = ra, rExcepts = excepts}
-            else err ["Rules must not contain redirections."]
+            then onSuccess c
+            else err [pack $ label ++ " must not contain redirections."]
         Right Script {sCommands = cmds} ->
-          err [pack $ "Rules must contain exactly one command (got: " ++ show (length cmds) ++ ")."]
+          err [pack $ label ++ " must contain exactly one command (got: " ++ show (length cmds) ++ ")."]
         Left errs -> err errs
+
+parseExcepts :: ConfigRule -> Either ParseRuleError [Except]
+parseExcepts r = mapM parseOne (fromMaybe [] (rUnless r))
+  where
+    anything = Quant Arg (Count 0 Nothing)
+    parseOne t = parseSingleCommand t "Unless clauses" r $ \c ->
+      Right $ Except ([anything] ++ cmdParts c ++ [anything])
+
+parseRule :: Policy -> ConfigRule -> Either ParseRuleError Rule
+parseRule pol r =
+  parseSingleCommand (rRule r) "Rules" r $ \c -> do
+    excepts <- parseExcepts r
+    let pa = fromMaybe All (rPipe r) -- Allow all pipes by default.
+        ra = fromMaybe Safe (rRedirect r) -- Allow safe redirects by default.
+    Right Rule {rCommand = c, rPolicy = pol, rPipeAccess = pa, rRedirectAccess = ra, rExcepts = excepts}
 
 parseConfig :: Config -> Either [ParseRuleError] Runtime
 parseConfig config =
