@@ -16,10 +16,9 @@ testRt :: [(Text, Policy)] -> Runtime
 testRt rules =
   right $
     parseConfig
-      Config
+      defaultConfig
         { cAllow = Just [tr {rRule = r} | (r, Allow) <- rules],
-          cDeny = Just [tr {rRule = r} | (r, Deny) <- rules],
-          cPath = Nothing
+          cDeny = Just [tr {rRule = r} | (r, Deny) <- rules]
         }
 
 spec :: Spec

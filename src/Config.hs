@@ -32,6 +32,7 @@ instance ToJSON ConfigRule where toJSON = genericToJSON jsonOptions
 data Config = Config
   { cAllow :: Maybe [ConfigRule],
     cDeny :: Maybe [ConfigRule],
+    cAllowSafeXargs :: Maybe Bool,
     cPath :: Maybe FilePath
   }
   deriving (Generic, Show)
@@ -46,7 +47,7 @@ configPath = do
   pure $ dir </> "config.json"
 
 defaultConfig :: Config
-defaultConfig = Config Nothing Nothing Nothing
+defaultConfig = Config Nothing Nothing Nothing Nothing
 
 initConfig :: IO ()
 initConfig = do

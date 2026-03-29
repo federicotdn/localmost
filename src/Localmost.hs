@@ -33,6 +33,7 @@ import Shell
     parseShellScript,
     simpleCommands,
   )
+import ShellCheck.AST (Id)
 import ShellCheck.AST qualified as AST
 import ShellCheck.Interface (ParseResult (..))
 import System.Exit (exitFailure)
@@ -86,6 +87,7 @@ instance Show Part where
 
 data Command = Command
   { cmdParts :: [Part],
+    cmdPipelineId :: Id,
     cmdPolicy :: Maybe Policy, -- Only used for input commands, not rules.
     cmdPipeIn :: Bool,
     cmdPipeOut :: Bool,
@@ -128,7 +130,11 @@ instance Show ParseRuleError where
       section title items =
         "\n| " <> title <> ":" <> mconcat (map ("\n|   " <>) items)
 
-newtype Runtime = Runtime {rRules :: [Rule]} deriving (Show)
+data Runtime = Runtime
+  { rRules :: [Rule],
+    rSafeXargs :: Bool
+  }
+  deriving (Show)
 
 data Mode = Strict | Flexible
 
@@ -181,7 +187,8 @@ parseConfig config =
       allErrs = allowErrs ++ denyErrs
    in if null allErrs
         then
-          Right Runtime {rRules = pdeny ++ pallow}
+          let safeXargs = fromMaybe True (cAllowSafeXargs config)
+           in Right Runtime {rRules = pdeny ++ pallow, rSafeXargs = safeXargs}
         else Left allErrs
 
 astAsScript :: ParseResult -> Bool -> Either Errors Script
@@ -200,7 +207,7 @@ unexpectedToken :: AST.Token -> Either Errors a
 unexpectedToken t = Left [pack $ "Unexpected token: " ++ showToken t ++ "."]
 
 buildCommand :: (AST.Token, AST.Token) -> Bool -> Either Errors Command
-buildCommand (AST.T_Pipeline _ _ cmds, redir@(AST.T_Redirecting _ redirs cmd)) isRule = do
+buildCommand (AST.T_Pipeline pipeId _ cmds, redir@(AST.T_Redirecting _ redirs cmd)) isRule = do
   let pipelineCmdIds = map AST.getId cmds
   let cmdId = AST.getId redir
   cmdIndex <- case elemIndex cmdId pipelineCmdIds of
@@ -213,6 +220,7 @@ buildCommand (AST.T_Pipeline _ _ cmds, redir@(AST.T_Redirecting _ redirs cmd)) i
   Right
     Command
       { cmdParts = parts,
+        cmdPipelineId = pipeId,
         cmdPolicy = Nothing,
         cmdPipeIn = pipeIn,
         cmdPipeOut = pipeOut,
@@ -364,11 +372,12 @@ computePolicy :: Runtime -> Script -> Policy
 computePolicy rt input@(Script {sCommands = cmds}) =
   let rules = rRules rt
       input' = applyRules rules input
+      input'' = if rSafeXargs rt then applySafeXargs rules input' else input'
       -- We only work on purely literal input commands, i.e. no variables,
       -- arithmetic, brace expansion, etc.
       allLiteral = all cmdIsLiteral cmds
    in if allLiteral
-        then fromMaybe defaultPolicy (scriptPolicy input')
+        then fromMaybe defaultPolicy (scriptPolicy input'')
         else defaultPolicy
   where
     cmdIsLiteral Command {cmdParts = parts} =
@@ -380,6 +389,34 @@ scriptPolicy Script {sCommands = cmds} =
    in if length cmds == length policies
         then Just $ maximum policies
         else Nothing
+
+applySafeXargs :: [Rule] -> Script -> Script
+applySafeXargs rules script = script {sCommands = go (sCommands script)}
+  where
+    go (c1 : c2 : rest) =
+      let continue = c1 : go (c2 : rest)
+       in if isCommand c1 "echo" && isCommand c2 "xargs" && cmdPipelineId c1 == cmdPipelineId c2
+            then case buildTemp c1 c2 of
+              Just temp ->
+                case applyRules rules (Script {sCommands = [temp]}) of
+                  Script {sCommands = [checked]} -> c1 : c2 {cmdPolicy = cmdPolicy checked} : go rest
+                  _ -> continue
+              Nothing -> continue
+            else continue
+    go cmds = cmds
+
+    buildTemp echo xargs =
+      let echoArgs = drop 1 $ cmdParts echo -- Drop "echo".
+          xargArgs = drop 1 $ cmdParts xargs
+       in case xargArgs of
+            -- xargs CMD: CMD + echo's args.
+            [part@(Literal l)]
+              | not ("-" `T.isPrefixOf` l) -> Just $ xargs {cmdParts = part : echoArgs}
+            _ -> Nothing
+
+    isCommand cmd name = case cmdParts cmd of
+      (Literal l : _) -> l == name
+      _ -> False
 
 applyRules :: [Rule] -> Script -> Script
 applyRules rules input = foldl (flip applyRule) input rules

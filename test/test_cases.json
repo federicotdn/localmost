@@ -186,5 +186,41 @@
       {"input": "c5 -xyz", "expect": "ask"},
       {"input": "c5 --xyz", "expect": "ask"}
     ]
+  },
+  {
+    "name": "safe xargs (enabled)",
+    "config": {
+      "allow": [
+        {"rule": "echo @arg*"},
+        {"rule": "grep @arg+"},
+        {"rule": "ls @arg*"}
+      ]
+    },
+    "cases": [
+      {"input": "echo foo | xargs grep", "expect": "allow"},
+      {"input": "echo foo bar | xargs grep", "expect": "allow"},
+      {"input": "echo foo | xargs ls", "expect": "allow"},
+      {"input": "echo foo | xargs rm", "expect": "ask"},
+      {"input": "echo foo | xargs -I{} grep", "expect": "ask"},
+      {"input": "echo foo | xargs grep -r", "expect": "ask"},
+      {"input": "echo | xargs grep", "expect": "ask"},
+      {"input": "echo foo; xargs grep", "expect": "ask"},
+      {"input": "echo foo | xargs grep > /dev/null", "expect": "allow"},
+      {"input": "echo foo | xargs grep > evil.txt", "expect": "ask"},
+      {"input": "echo foo | xargs", "expect": "ask"}
+    ]
+  },
+  {
+    "name": "safe xargs (disabled)",
+    "config": {
+      "allow": [
+        {"rule": "echo @arg*"},
+        {"rule": "grep @arg+"}
+      ],
+      "allowSafeXargs": false
+    },
+    "cases": [
+      {"input": "echo foo | xargs grep", "expect": "ask"}
+    ]
   }
 ]

@@ -52,7 +52,7 @@ Localmost is configured via a single `config.json` file. You can create an empty
 localmost init
 ```
 
-The top level keys for the file are `allow` and `deny`, each one containing a list of rules. Here's a quick example:
+Here's a quick example of what a customized configuration file could look like:
 
 ```json
 {
@@ -68,6 +68,12 @@ The top level keys for the file are `allow` and `deny`, each one containing a li
   ]
 }
 ```
+
+Following is an explanation of each top-level key for `config.json`.
+
+### `allow` and `deny`
+
+These two keys can contain a list of rules.
 
 Rules are written using a special syntax, which is syntatically still bash, but the meaning of some expressions is changed. It allows using "meta expressions" to represent a set of expressions that might appear in input commands. The rule text itself must be placed in the `rule` key, for each rule.
 
@@ -106,6 +112,17 @@ Additionally, each rule can also set the following keys:
   - `false` will make the rule match only if the subcommand is not part of a pipeline.
   - `"in"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the very end of one.
   - `"out"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the beginning of one.
+
+### `allowSafeXargs`
+
+Can be set to `true` or `false` (default: `true`).
+
+When set to `true`, commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*`.
+
+If set to `false`, no special processing will be done for these situations.
+
+> [!WARNING]
+> Adding manual `allow` rules for `xargs` is not recommended, since `xargs` will read its arguments from `stdin`, which is not something a rule can operate on in any way.
 
 ## Tips
 
