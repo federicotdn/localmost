@@ -47,6 +47,7 @@ jobs:
 
       - name: Install ghcup, GHC, and cabal
         run: |
+          export GHCUP_USE_XDG_DIRS=0
           export GHCUP_INSTALL_BASE_PREFIX="$HOME"
           export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
           export BOOTSTRAP_HASKELL_GHC_VERSION=${{ env.GHC_VERSION }}
@@ -55,7 +56,6 @@ jobs:
           if [ ! -f ~/.ghcup/bin/ghcup ]; then
             curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
           fi
-          export GHCUP_USE_XDG_DIRS=0
           ~/.ghcup/bin/ghcup install ghc ${{ env.GHC_VERSION }} --set
           ~/.ghcup/bin/ghcup install cabal ${{ env.CABAL_VERSION }} --set
           echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
