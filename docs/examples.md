@@ -33,7 +33,7 @@ Note: these are a work-in-progress, and might not be 100% safe to use.
     {"rule": "uv sync @*"},
     {"rule": "uv run pytest @*"},
     {"rule": "uv run make test @*"},
-    {"rule": "localmost @{check,validate,ast}" @*},
+    {"rule": "localmost @{check,validate,ast} @*"},
     {"rule": "grep @*"},
     {"rule": "tr @*"},
     {"rule": "cd @path"},
