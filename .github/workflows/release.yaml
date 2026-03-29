@@ -66,13 +66,14 @@ jobs:
         run: |
           bin=$(cabal list-bin localmost)
           strip "$bin"
-          cp "$bin" localmost-${{ matrix.name }}
+          cp "$bin" localmost
+          tar czf localmost-${{ matrix.name }}.tar.gz localmost
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
-          name: localmost-${{ matrix.name }}
-          path: localmost-${{ matrix.name }}
+          name: localmost-${{ matrix.name }}.tar.gz
+          path: localmost-${{ matrix.name }}.tar.gz
 
   release:
     name: Create Release
