@@ -41,6 +41,7 @@ jobs:
           path: |
             ~/.ghcup
             ~/.cabal/store
+            ~/.local/state/cabal/store
             dist-newstyle
           key: ${{ matrix.name }}-${{ env.GHC_VERSION }}-${{ hashFiles('localmost.cabal') }}
           restore-keys: ${{ matrix.name }}-${{ env.GHC_VERSION }}-
