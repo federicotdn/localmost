@@ -4,15 +4,16 @@ module Config
     configPath,
     loadConfig,
     defaultConfig,
+    initConfig,
   )
 where
 
-import Data.Aeson (FromJSON, ToJSON, eitherDecode, genericParseJSON, genericToJSON, parseJSON, toJSON)
+import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, genericParseJSON, genericToJSON, parseJSON, toJSON)
 import Data.ByteString.Lazy qualified as BL
 import Data.Text (Text, pack)
 import GHC.Generics (Generic)
-import System.Directory (XdgDirectory (XdgConfig), doesFileExist, getXdgDirectory)
-import System.FilePath ((</>))
+import System.Directory (XdgDirectory (XdgConfig), createDirectoryIfMissing, doesFileExist, getXdgDirectory)
+import System.FilePath (takeDirectory, (</>))
 import Types (PipeAccess (..), RedirectAccess (..))
 import Utils (jsonOptions, tryIO)
 
@@ -46,6 +47,18 @@ configPath = do
 
 defaultConfig :: Config
 defaultConfig = Config Nothing Nothing Nothing
+
+initConfig :: IO ()
+initConfig = do
+  path <- configPath
+  exists <- doesFileExist path
+  if exists
+    then putStrLn $ "Configuration file already exists at " ++ path ++ "."
+    else do
+      createDirectoryIfMissing True (takeDirectory path)
+      let emptyConfig = Config {cAllow = Just [], cDeny = Nothing, cPath = Nothing}
+      BL.writeFile path (encode emptyConfig)
+      putStrLn $ "Created configuration file at " ++ path ++ "."
 
 loadConfig :: IO (Either Text Config)
 loadConfig = do
