@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  GHC_VERSION: "9.12.2"
+  CABAL_VERSION: "3.16.1.0"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: macos-26-intel
+            name: macos-x86_64
+          - os: macos-26
+            name: macos-aarch64
+
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache ghcup, cabal store, and dist-newstyle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ghcup
+            ~/.cabal/store
+            dist-newstyle
+          key: ${{ matrix.name }}-${{ env.GHC_VERSION }}-${{ hashFiles('localmost.cabal') }}
+          restore-keys: ${{ matrix.name }}-${{ env.GHC_VERSION }}-
+
+      - name: Install ghcup, GHC, and cabal
+        run: |
+          export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
+          export BOOTSTRAP_HASKELL_GHC_VERSION=${{ env.GHC_VERSION }}
+          export BOOTSTRAP_HASKELL_CABAL_VERSION=${{ env.CABAL_VERSION }}
+          export BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1
+          if [ ! -f ~/.ghcup/bin/ghcup ]; then
+            curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+          fi
+          echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: cabal build -j -f -dev --enable-executable-static --ghc-options='-split-sections'
+
+      - name: Prepare binary
+        run: |
+          bin=$(cabal list-bin localmost)
+          strip "$bin"
+          cp "$bin" localmost-${{ matrix.name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: localmost-${{ matrix.name }}
+          path: localmost-${{ matrix.name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release and upload binaries
+        run: gh release create "${{ github.ref_name }}" artifacts/* --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
