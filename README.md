@@ -158,6 +158,7 @@ echo 'ls -a' | localmost check --mode simple
 - Since localmost is an external process, you don't need to reload your Claude Code session in order for any configuration changes to be picked up.
 - Only use `@arg*`/`@*` for commands that you are very familiar with, and are sure that cannot be used in a destructive way, e.g. `echo` or `ls`. If you do use `@arg`/`@*`, consider adding `unless` clauses as well in order to un-match specific flags.
 - An `unless` value of `["-a", "-b", "-c"]` can also be written as `["@{-a,-b,-c}"]`, making it a bit more compact.
+- See the [examples.md](docs/examples.md) file for some configuration file examples.
 
 ## License
 
