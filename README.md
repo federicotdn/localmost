@@ -17,6 +17,8 @@ When Claude Code wants to execute a bash command, localmost parses all rules and
 
 It supports a **subset** of bash, falling back to `ask` where necessary. For example, a command with an expression like `$var` will always result in `ask`.
 
+The largest advantage of using ShellCheck is that it gives localmost the ability to parse complex command sequences, even when they contain pipes, redirects, `if` statements, `for` loops, etc. This is much more reliable than say a regex-based approach.
+
 ## Installation
 
 ...
@@ -100,6 +102,10 @@ Additionally, each rule can also set the following keys:
   - `false` implies that the rule only matches if the input subcommands has no redirects.
   - `"safe"` implies that the rule only matches if the input subcommand has only "safe" redirects, e.g. `> /dev/null`.
 - `pipe`: Can be `true`, `false`, `"in"` or `"out"`.
+  - `true` will make the rule match without considering if the subcommand is part of a pipeline.
+  - `false` will make the rule match only if the subcommand is not part of a pipeline.
+  - `"in"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the very end of one.
+  - `"out"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the beginning of one.
 
 ## Tips
 
