@@ -1,11 +1,27 @@
-module Protocol (Proto (..), claudeCode) where
+module Protocol
+  ( Proto (..),
+    claudeCode,
+    simpleText,
+  )
+where
 
-import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, genericParseJSON, genericToJSON, parseJSON, toJSON)
+import Data.Aeson
+  ( FromJSON,
+    ToJSON,
+    eitherDecode,
+    encode,
+    genericParseJSON,
+    genericToJSON,
+    parseJSON,
+    toJSON,
+  )
 import Data.ByteString.Lazy qualified as BL
+import Data.Char (toLower)
 import Data.Text (Text, intercalate, pack)
+import Data.Text.IO qualified as TIO
 import GHC.Generics (Generic)
 import Types (Errors, Policy (..))
-import Utils (jsonOptions, jsonOptionsLax)
+import Utils (ePutStrLn, jsonOptions, jsonOptionsLax)
 
 -- | Proto separates the actual IO operations of reading and writing scripts, results and
 -- errors from the real validation logic. In theory, implementing the functions below could
@@ -19,7 +35,7 @@ data Proto = Proto
 ---- Claude Code
 
 data HookEvent = HookEvent
-  { hCwd :: Text, -- TODO: Unused
+  { hCwd :: Maybe Text, -- TODO: Unused
     hTool_input :: HookEventInput
   }
   deriving (Generic, Show)
@@ -66,4 +82,14 @@ claudeCode =
     { pReadInput = readInput,
       pWritePolicy = writeResponse . policyResponse,
       pWriteErrors = writeResponse . errResponse
+    }
+
+---- Simple
+
+simpleText :: Proto
+simpleText =
+  Proto
+    { pReadInput = Right <$> TIO.getLine,
+      pWritePolicy = putStrLn . map toLower . show,
+      pWriteErrors = \errs -> ePutStrLn $ "[localmost] Error: " ++ show (intercalate ", " errs)
     }

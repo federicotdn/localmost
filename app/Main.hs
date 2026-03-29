@@ -13,20 +13,26 @@ import Options.Applicative
     hsubparser,
     info,
     long,
+    option,
     progDesc,
+    short,
+    str,
     switch,
+    value,
     (<**>),
   )
-import Protocol (claudeCode)
+import Protocol (claudeCode, simpleText)
 
 newtype AstOpts = AstOpts {aoRule :: Bool}
 
-data Command = Check | Validate | Init | Ast AstOpts
+newtype CheckOpts = CheckOpts {coMode :: String}
+
+data Command = Check CheckOpts | Validate | Init | Ast AstOpts
 
 newtype Options = Options {oCommand :: Command}
 
 checkCommand :: Parser Command
-checkCommand = pure Check
+checkCommand = Check . CheckOpts <$> option str (long "mode" <> short 'm' <> value "claude" <> help "Protocol mode: claude, text.")
 
 validateCommand :: Parser Command
 validateCommand = pure Validate
@@ -44,7 +50,7 @@ parser =
       ( command "check" (info checkCommand (progDesc "Check if bash command should be run."))
           <> command "validate" (info validateCommand (progDesc "Validate the config.json file."))
           <> command "init" (info initCommand (progDesc "Create a default config.json file."))
-          <> command "ast" (info astCommand (progDesc "Parse a script and print its AST."))
+          <> command "ast" (info astCommand (progDesc "Parse a script and print its AST (debugging)."))
       )
 
 main :: IO ()
@@ -57,7 +63,11 @@ main = do
   opts <- execParser fullParser
 
   case oCommand opts of
-    Check -> check claudeCode
+    Check checkOpts ->
+      let proto = case coMode checkOpts of
+            "text" -> simpleText
+            _ -> claudeCode
+       in check proto
     Validate -> validate
     Init -> initConfig
     Ast astOpts -> ast (aoRule astOpts)

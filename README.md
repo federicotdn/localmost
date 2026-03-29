@@ -9,13 +9,13 @@ A flexible and deterministic Claude Code `PreToolUse` tool based on [ShellCheck]
 
 Localmost uses the [PreToolUse](https://code.claude.com/docs/en/hooks#pretooluse) hook which fires before each bash command execution attempt, and based on a `config.json` file, decides on one of three possible policies: `allow`, `ask` or `deny`. The configuration file contains a list of `allow` and `deny` rules.
 
-When Claude Code wants to execute a bash command, localmost parses all rules and the input command using ShellCheck. Then, it uses the AST representation of both to decide on a policy:
+When Claude Code wants to execute a bash command, localmost parses all rules and the input command using ShellCheck. Then, it uses their AST representation to decide on a policy:
 
 1. First, it breaks the input command into subcommands. For example, `echo | foo; bar` contains three bash subcommands: `echo`, `foo` and `bar`.
-2. For each one, it checks for matches against all the `deny` and `allow` rules.
-3. If **any** subcommand is denied, then the resulting policy is `deny`. If **all** subcommands are allowed, then the result is `allow`. Otherwise, the result is `ask`.
+2. For each one, it checks for matches against all the `deny` and `allow` rules. If any `deny` rule matches, the subcommand is denied. Otherwise, if any `allow` rule matches, the subcommand is allowed.
+3. Finally, if **any** subcommand is denied, then the resulting policy for the input command is `deny`. If **all** subcommands are allowed, then the result is `allow`. Otherwise, the result is `ask`.
 
-It supports a **subset** of bash, falling back to `ask` where necessary. For example, a command with an expression like `$var` will always result in `ask`.
+As a note, localmost supports only a **subset** of bash, falling back to `ask` where necessary. For example, a command with an expression like `$var` will always result in `ask`.
 
 The largest advantage of using ShellCheck is that it gives localmost the ability to parse complex command sequences, even when they contain pipes, redirects, `if` statements, `for` loops, etc. This is much more reliable than say a regex-based approach.
 
@@ -69,7 +69,9 @@ Here's a quick example of what a customized configuration file could look like:
 }
 ```
 
-Following is an explanation of each top-level key for `config.json`.
+You can always validate your configuration file by running `localmost validate`. If your configuration file is not valid or is not present, localmost will default to the `ask` policy.
+
+Following is an explanation of each top-level key for `config.json`:
 
 ### `allow` and `deny`
 
@@ -79,17 +81,17 @@ Rules are written using a special syntax, which is syntatically still bash, but 
 
 Here's a full overview of the rules syntax:
 
-| Expression    | Meaning                                                                                                                                           |
-|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `abc`         | A literal string `abc` will match `abc`, `'abc'` and `"abc"`.                                                                                     |
-| `@arg`        | Matches any argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument.              |
-| `@path`       | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths. |
-| `@int`        | Matches an argument containing an integer value, e.g. `1234`.                                                                                     |
-| `@@`          | Matches a literal `@` character.                                                                                                                  |
-| `@{v1,v2,v3}` | Choice: matches any of `v1`, `v2` or `v3`.                                                                                                        |
-| `@(v1 v2 v3)` | Group: matches `v1 v2 v3` in that specific order.                                                                                                 |
+| Meta expression | Meaning                                                                                                                                           |
+|-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| `abc`           | Not really a meta expression per se. A literal string `abc` will match `abc`, `'abc'` and `"abc"`.                                                |
+| `@arg`          | Matches any argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument.              |
+| `@path`         | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths. |
+| `@int`          | Matches an argument containing an integer value, e.g. `1234`.                                                                                     |
+| `@@`            | Matches a literal `@` character.                                                                                                                  |
+| `@{v1,v2,v3}`   | Choice: matches one of `v1`, `v2` or `v3`.                                                                                                        |
+| `@(v1 v2 v3)`   | Group: matches `v1 v2 v3` in that specific order.                                                                                                 |
 
-In addition to that, expressions (except literals) can also have quantifiers:
+In addition to that, meta expressions can also have quantifiers:
 
 | Quantifier | Meaning                              |
 |------------|--------------------------------------|
@@ -117,13 +119,31 @@ Additionally, each rule can also set the following keys:
 
 Can be set to `true` or `false` (default: `true`).
 
-When set to `true`, commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*`.
+When set to `true`, commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*` (in order to allow for the `echo` to run).
 
 If set to `false`, no special processing will be done for these situations.
 
 > [!WARNING]
 > Adding manual `allow` rules for `xargs` is not recommended, since `xargs` will read its arguments from `stdin`, which is not something a rule can operate on in any way.
 
+## Usage
+
+Run `localmost --help` to see usage help.
+
+You can call `localmost check` manually in order to test out command policies:
+
+```bash
+echo 'ls -a' | localmost check --mode simple
+```
+
 ## Tips
 
-- Since localmost is an external process, you don't need to reload your (e.g. Claude Code) session in order for any configuration changes to be picked up.
+- Since localmost is an external process, you don't need to reload your Claude Code session in order for any configuration changes to be picked up.
+- Only use `@arg*`/`@*` for commands that you are very familiar with, and are sure that cannot be used in a destructive way, e.g. `echo` or `ls`. If you do use `@arg`/`@*`, consider adding `unless` clauses as well in order to un-match specific flags.
+- An `unless` value of `["-a", "-b", "-c"]` can also be written as `["@{-a,-b,-c}"]`, making it a bit more compact.
+
+## License
+
+Distributed under the GNU General Public License, version 3.
+
+See [LICENSE](LICENSE) for more information.

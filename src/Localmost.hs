@@ -407,9 +407,8 @@ applySafeXargs rules script = script {sCommands = go (sCommands script)}
 
     buildTemp echo xargs =
       let echoArgs = drop 1 $ cmdParts echo -- Drop "echo".
-          xargArgs = drop 1 $ cmdParts xargs
+          xargArgs = drop 1 $ cmdParts xargs -- Drop "xargs".
        in case xargArgs of
-            -- xargs CMD: CMD + echo's args.
             [part@(Literal l)]
               | not ("-" `T.isPrefixOf` l) -> Just $ xargs {cmdParts = part : echoArgs}
             _ -> Nothing
