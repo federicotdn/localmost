@@ -52,17 +52,51 @@ The top level keys for the file are `allow` and `deny`, each one containing a li
 ```json
 {
   "allow": [
-    {"rule": "echo @*"}
-    {"rule": "git @(-C @path)? @{log,status,diff,show,blame} @*"},
-    {
-      "rule": "find @*",
-      "unless": ["@{-delete,-fprint,-fprint0,-fprintf,-fls,-exec,-execdir,-ok,-okdir}"]
-    }
+    {"rule": "echo @arg*"}
+    {"rule": "mkdir @(-p)? @path"},
+    {"rule": "ls @{-l,-a}* @path"},
+    {"rule": "head @*"},
+    {"rule": "find @*", "unless": ["-exec", "-delete"]}
+  ],
+  "deny": [
+    {"rule": "rm @arg*"}
   ]
 }
 ```
 
-If a command matches a `deny` rule, it is denied. If it matches instead an `allow` rule, it is allowed. If it matches none, the result is `ask`.
+Rules are written using a special syntax, which is syntatically still bash, but the meaning of some expressions is changed. It allows using "meta expressions" to represent a set of expressions that might appear in input commands. The rule text itself must be placed in the `rule` key, for each rule.
+
+Here's a full overview of the rules syntax:
+
+| Expression    | Meaning                                                                                                                                           |
+|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| `abc`         | A literal string `abc` will match `abc`, `'abc'` and `"abc"`.                                                                                     |
+| `@arg`        | Matches any argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument.              |
+| `@path`       | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths. |
+| `@int`        | Matches an argument containing an integer value, e.g. `1234`.                                                                                     |
+| `@@`          | Matches a literal `@` character.                                                                                                                  |
+| `@{v1,v2,v3}` | Choice: matches any of `v1`, `v2` or `v3`.                                                                                                        |
+| `@(v1 v2 v3)` | Group: matches `v1 v2 v3` in that specific order.                                                                                                 |
+
+In addition to that, expressions (except literals) can also have quantifiers:
+
+| Quantifier | Meaning                              |
+|------------|--------------------------------------|
+| `?`        | Zero or one time. E.g. `@arg?`.      |
+| `+`        | One or more times. E.g. `@{-a,-b}+`. |
+| `*`        | Zero or more times. E.g. `@int*`     |
+
+> [!TIP]
+> As a special case, `@*` is a shortcut for `@arg*`, allowing you to write e.g. `echo @*`.
+
+Additionally, each rule can also set the following keys:
+
+- `unless`: List of expressions that **must not** appear anywhere in the input subcommand in order for the rule to match. This is particularly useful for commands where only a few flags could be considered problematic, so one can set the rule to `foo @*` and then "un-match" some flags.
+- `redirect`: Can be `true`, `false` or `"safe"` (default: `"safe"`).
+  - `true` implies that the rule matches no matter which redirects the input sucommand has.
+  - `false` implies that the rule only matches if the input subcommands has no redirects.
+  - `"safe"` implies that the rule only matches if the input subcommand has only "safe" redirects, e.g. `> /dev/null`.
+- `pipe`: Can be `true`, `false`, `"in"` or `"out"`.
 
 ## Tips
 
