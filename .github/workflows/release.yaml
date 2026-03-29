@@ -56,12 +56,10 @@ jobs:
           export BOOTSTRAP_HASKELL_GHC_VERSION=${{ env.GHC_VERSION }}
           export BOOTSTRAP_HASKELL_CABAL_VERSION=${{ env.CABAL_VERSION }}
           export BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1
-          if ! command -v ghcup &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-            echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
-            echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
-            export PATH="$HOME/.ghcup/bin:$HOME/.cabal/bin:$PATH"
-          fi
+          curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+          echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.ghcup/bin:$HOME/.cabal/bin:$PATH"
           ghcup install ghc ${{ env.GHC_VERSION }} --set
           ghcup install cabal ${{ env.CABAL_VERSION }} --set
           cabal update
@@ -70,6 +68,7 @@ jobs:
         run: cabal test -j -f -dev
 
       - name: Build
+        if: startsWith(github.ref, 'refs/tags/')
         run: cabal build -j -f -dev ${{ matrix.static == true && '--enable-executable-static' || '' }} --ghc-options='-split-sections'
 
       - name: Prepare binary
