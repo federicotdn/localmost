@@ -57,7 +57,8 @@ initConfig = do
     then putStrLn $ "Configuration file already exists at " ++ path ++ "."
     else do
       createDirectoryIfMissing True (takeDirectory path)
-      let emptyConfig = Config {cAllow = Just [], cDeny = Nothing, cPath = Nothing, cAllowSafeXargs = Nothing}
+      let rule = ConfigRule {rRule = "echo @arg*", rPipe = Nothing, rRedirect = Nothing, rUnless = Nothing}
+      let emptyConfig = Config {cAllow = Just [rule], cDeny = Nothing, cPath = Nothing, cAllowSafeXargs = Nothing}
       BL.writeFile path (encode emptyConfig)
       putStrLn $ "Created configuration file at " ++ path ++ "."
 

@@ -569,6 +569,10 @@ textMatches rule input mode =
     -- that is better than a false negative (not denying when we
     -- should have). Worst case scenario, the policy ends up being
     -- Ask.
+    -- This behaviour is coincidentally also useful for flags like
+    -- sed's -i, which can be set to -iSUFFIX. In this case, we will
+    -- assume the flags are -iSUFFIX, -i, -S, -U, etc., which might be
+    -- a bit excessive for some cases, but still useful.
     -- Flags like --foo are treated as-is.
     flags text
       | text == "-" || text == "--" = [] -- Do not treat these as flags.
