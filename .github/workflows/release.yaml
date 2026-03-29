@@ -38,31 +38,25 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Cache ghcup, cabal store, and dist-newstyle
+      - name: Setup Haskell
+        id: ghcup
+        uses: haskell/ghcup-setup@v1
+        with:
+          ghc: ${{ env.GHC_VERSION }}
+          cabal: ${{ env.CABAL_VERSION }}
+
+      - name: Cache cabal store and dist-newstyle
         uses: actions/cache@v5
         with:
           path: |
-            ~/.ghcup
             ~/.cabal/store
-            ~/.cabal/packages
             ~/.local/state/cabal/store
             dist-newstyle
           key: ${{ matrix.name }}-${{ env.GHC_VERSION }}-${{ hashFiles('localmost.cabal') }}
           restore-keys: ${{ matrix.name }}-${{ env.GHC_VERSION }}-
 
-      - name: Install ghcup, GHC, and cabal
-        run: |
-          export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
-          export BOOTSTRAP_HASKELL_GHC_VERSION=${{ env.GHC_VERSION }}
-          export BOOTSTRAP_HASKELL_CABAL_VERSION=${{ env.CABAL_VERSION }}
-          export BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1
-          curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-          echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
-          export PATH="$HOME/.ghcup/bin:$HOME/.cabal/bin:$PATH"
-          ghcup install ghc ${{ env.GHC_VERSION }} --set
-          ghcup install cabal ${{ env.CABAL_VERSION }} --set
-          cabal update
+      - name: Update cabal index
+        run: cabal update
 
       - name: Test
         run: cabal test -j -f -dev
