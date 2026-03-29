@@ -55,6 +55,7 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
             echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
             echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.ghcup/bin:$HOME/.cabal/bin:$PATH"
           fi
           ghcup install ghc ${{ env.GHC_VERSION }} --set
           ghcup install cabal ${{ env.CABAL_VERSION }} --set
