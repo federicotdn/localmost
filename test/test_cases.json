@@ -86,7 +86,8 @@
       {"input": "foo2 | foo", "expect": "deny"},
       {"input": "outputter2 | foo", "expect": "deny"},
       {"input": "foo | inputter2", "expect": "deny"},
-      {"input": "nothing2 | foo", "expect": "ask"}
+      {"input": "nothing2 | foo", "expect": "ask"},
+      {"input": "foo | foo; nothing; foo | foo && nothing", "expect": "allow"}
     ]
   },
   {
