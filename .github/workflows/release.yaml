@@ -65,6 +65,7 @@ jobs:
           cabal build -j -f -dev ${{ matrix.static == true && '--enable-executable-static' || '' }} --ghc-options='-split-sections'
 
       - name: Prepare binary
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           bin=$(cabal list-bin localmost)
           strip "$bin"
@@ -72,6 +73,7 @@ jobs:
           tar czf localmost-${{ matrix.name }}.tar.gz localmost
 
       - name: Upload artifact
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v6
         with:
           name: localmost-${{ matrix.name }}.tar.gz
