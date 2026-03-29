@@ -47,26 +47,18 @@ jobs:
 
       - name: Install ghcup, GHC, and cabal
         run: |
-          export GHCUP_USE_XDG_DIRS=0
-          export GHCUP_INSTALL_BASE_PREFIX="$HOME"
           export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
           export BOOTSTRAP_HASKELL_GHC_VERSION=${{ env.GHC_VERSION }}
           export BOOTSTRAP_HASKELL_CABAL_VERSION=${{ env.CABAL_VERSION }}
           export BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1
-          if [ ! -f ~/.ghcup/bin/ghcup ]; then
+          if ! command -v ghcup &> /dev/null; then
             curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+            echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
+            echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
           fi
-          ~/.ghcup/bin/ghcup install ghc ${{ env.GHC_VERSION }} --set
-          ~/.ghcup/bin/ghcup install cabal ${{ env.CABAL_VERSION }} --set
-          echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
-          ~/.ghcup/bin/cabal update
-
-      - name: Verify toolchain
-        run: |
-          which ghc
-          ghc --version
-          ghc-pkg list base
+          ghcup install ghc ${{ env.GHC_VERSION }} --set
+          ghcup install cabal ${{ env.CABAL_VERSION }} --set
+          cabal update
 
       - name: Test
         run: cabal test -j -f -dev
