@@ -25,12 +25,14 @@ The largest advantage of using ShellCheck is that it gives localmost the ability
 1. Head over to the [releases](https://github.com/federicotdn/localmost/releases) section.
 2. Download the latest one for your OS and CPU architecture, and place it somewhere in `$PATH`.
 
+Note: Windows is not supported yet.
+
 **From source:**
 1. Install [ghcup](https://www.haskell.org/ghcup/), GHC and Cabal.
 2. Clone this repo: `git clone git@github.com:federicotdn/localmost.git && cd localmost`.
 3. Run `make install` (assumes `.ghcup/env` shim is set up).
 
-Ensure that localmost has been installed correctly:
+Afterwards, ensure that localmost has been installed correctly:
 ```
 localmost --version
 ```
@@ -49,7 +51,7 @@ Finally, place the following in your Claude Code's `settings.json` file:
 }
 ```
 
-This will instruct Claude Code to use localmost to decide on bash command execution.
+this will instruct Claude Code to use localmost to decide on bash commands execution.
 
 ## Configuration
 
@@ -111,16 +113,21 @@ In addition to that, meta expressions can also have quantifiers:
 
 Additionally, each rule can also set the following keys:
 
-- `unless`: List of expressions that **must not** appear anywhere in the input subcommand in order for the rule to match. This is particularly useful for commands where only a few flags could be considered problematic, so one can set the rule to `foo @*` and then "un-match" some flags.
-- `redirect`: Can be `true`, `false` or `"safe"` (default: `"safe"`).
-  - `true` implies that the rule matches no matter which redirects the input sucommand has.
-  - `false` implies that the rule only matches if the input subcommands has no redirects.
-  - `"safe"` implies that the rule only matches if the input subcommand has only "safe" redirects, e.g. `> /dev/null`.
-- `pipe`: Can be `true`, `false`, `"in"` or `"out"`.
-  - `true` will make the rule match without considering if the subcommand is part of a pipeline.
-  - `false` will make the rule match only if the subcommand is not part of a pipeline.
-  - `"in"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the very end of one.
-  - `"out"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the beginning of one.
+**`unless`**
+List of expressions that **must not** appear anywhere in the input subcommand in order for the rule to match. This is particularly useful for commands where only a few flags could be considered problematic, so one can set the rule to `foo @*` and then "un-match" some flags. Defaults to an empty list.
+
+**`redirect`**
+Can be `true`, `false` or `"safe"` (default: `"safe"`):
+- `true` implies that the rule matches no matter which redirects the input sucommand has.
+- `false` implies that the rule only matches if the input subcommands has no redirects.
+- `"safe"` implies that the rule only matches if the input subcommand has only "safe" redirects, e.g. `> /dev/null`.
+
+**`pipe`**
+Can be `true`, `false`, `"in"` or `"out"` (default: `true`):
+- `true` will make the rule match without considering if the subcommand is part of a pipeline.
+- `false` will make the rule match only if the subcommand is not part of a pipeline.
+- `"in"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the very end of one.
+- `"out"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the beginning of one.
 
 ### `allowSafeXargs`
 
