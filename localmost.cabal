@@ -45,6 +45,8 @@ library
 executable localmost
     import:           shared
     main-is:          Main.hs
+    autogen-modules:  Paths_localmost
+    other-modules:    Paths_localmost
     hs-source-dirs:   app
     build-depends:    localmost
                     , optparse-applicative ^>=0.19.0.0

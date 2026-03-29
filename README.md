@@ -21,11 +21,18 @@ The largest advantage of using ShellCheck is that it gives localmost the ability
 
 ## Installation
 
-...
+**Pre-built binaries:**
+1. Head over to the [releases](https://github.com/federicotdn/localmost/releases) section.
+2. Download the latest one for your OS and CPU architecture, and place it somewhere in `$PATH`.
+
+**From source:**
+1. Install [ghcup](https://www.haskell.org/ghcup/), GHC and Cabal.
+2. Clone this repo: `git clone git@github.com:federicotdn/localmost.git && cd localmost`.
+3. Run `make install` (assumes `.ghcup/env` shim is set up).
 
 Ensure that localmost has been installed correctly:
 ```
-localmost --help
+localmost --version
 ```
 
 Finally, place the following in your Claude Code's `settings.json` file:

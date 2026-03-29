@@ -1,6 +1,7 @@
 module Main where
 
 import Config (initConfig)
+import Data.Version (showVersion)
 import Localmost (ast, check, validate)
 import Options.Applicative
   ( Parser,
@@ -16,11 +17,13 @@ import Options.Applicative
     option,
     progDesc,
     short,
+    simpleVersioner,
     str,
     switch,
     value,
     (<**>),
   )
+import Paths_localmost (version)
 import Protocol (claudeCode, simpleText)
 
 newtype AstOpts = AstOpts {aoRule :: Bool}
@@ -32,7 +35,7 @@ data Command = Check CheckOpts | Validate | Init | Ast AstOpts
 newtype Options = Options {oCommand :: Command}
 
 checkCommand :: Parser Command
-checkCommand = Check . CheckOpts <$> option str (long "mode" <> short 'm' <> value "claude" <> help "Protocol mode: claude, text.")
+checkCommand = Check . CheckOpts <$> option str (long "mode" <> short 'm' <> value "claude" <> help "Protocol mode: claude, text")
 
 validateCommand :: Parser Command
 validateCommand = pure Validate
@@ -41,23 +44,23 @@ initCommand :: Parser Command
 initCommand = pure Init
 
 astCommand :: Parser Command
-astCommand = Ast . AstOpts <$> switch (long "rule" <> help "Parse input as a rule (resolve meta vars).")
+astCommand = Ast . AstOpts <$> switch (long "rule" <> help "Parse input as a rule (resolve meta vars)")
 
 parser :: Parser Options
 parser =
   Options
     <$> hsubparser
-      ( command "check" (info checkCommand (progDesc "Check if bash command should be run."))
-          <> command "validate" (info validateCommand (progDesc "Validate the config.json file."))
-          <> command "init" (info initCommand (progDesc "Create a default config.json file."))
-          <> command "ast" (info astCommand (progDesc "Parse a script and print its AST (debugging)."))
+      ( command "check" (info checkCommand (progDesc "Check if bash command should be run"))
+          <> command "validate" (info validateCommand (progDesc "Validate the config.json file"))
+          <> command "init" (info initCommand (progDesc "Create a default config.json file"))
+          <> command "ast" (info astCommand (progDesc "Parse a script and print its AST (debugging)"))
       )
 
 main :: IO ()
 main = do
   let fullParser =
         info
-          (parser <**> helper)
+          (parser <**> simpleVersioner (showVersion version) <**> helper)
           (fullDesc <> header "localmost - A Claude Code PreToolUse tool based on ShellCheck.")
 
   opts <- execParser fullParser
