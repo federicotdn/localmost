@@ -58,11 +58,13 @@ jobs:
           ~/.ghcup/bin/ghcup install cabal ${{ env.CABAL_VERSION }} --set
           echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
+          ~/.ghcup/bin/cabal update
+
+      - name: Test
+        run: cabal test -j -f -dev
 
       - name: Build
-        run: |
-          cabal update
-          cabal build -j -f -dev ${{ matrix.static == true && '--enable-executable-static' || '' }} --ghc-options='-split-sections'
+        run: cabal build -j -f -dev ${{ matrix.static == true && '--enable-executable-static' || '' }} --ghc-options='-split-sections'
 
       - name: Prepare binary
         if: startsWith(github.ref, 'refs/tags/')
