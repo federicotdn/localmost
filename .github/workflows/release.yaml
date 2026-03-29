@@ -62,6 +62,12 @@ jobs:
           echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
           ~/.ghcup/bin/cabal update
 
+      - name: Verify toolchain
+        run: |
+          which ghc
+          ghc --version
+          ghc-pkg list base
+
       - name: Test
         run: cabal test -j -f -dev
 
