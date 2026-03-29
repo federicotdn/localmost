@@ -49,11 +49,15 @@ jobs:
           if [ ! -f ~/.ghcup/bin/ghcup ]; then
             curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
           fi
+          ~/.ghcup/bin/ghcup install ghc ${{ env.GHC_VERSION }} --set
+          ~/.ghcup/bin/ghcup install cabal ${{ env.CABAL_VERSION }} --set
           echo "$HOME/.ghcup/bin" >> "$GITHUB_PATH"
           echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
 
       - name: Build
-        run: cabal build -j -f -dev --enable-executable-static --ghc-options='-split-sections'
+        run: |
+          cabal update
+          cabal build -j -f -dev --enable-executable-static --ghc-options='-split-sections'
 
       - name: Prepare binary
         run: |
