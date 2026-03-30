@@ -2,6 +2,13 @@
 
 A flexible and deterministic Claude Code `PreToolUse` tool based on [ShellCheck](https://www.shellcheck.net/).
 
+Features:
+- Write permission rules using a regular expression-like syntax.
+- Correctly parses complex commands using `|`, `;`, `if`, `for`, `&&`, `||`, `>` and more.
+- Configure file redirections per command.
+- Configure ability to pipe in and/or out per command as well.
+- Automatically allows safe `xargs` commands to be executed.
+
 > [!WARNING]
 > Localmost is still at a very early stage of development, and works best under the assumption that Claude Code is not actively trying to execute destructive bash commands.
 
@@ -17,7 +24,7 @@ When Claude Code wants to execute a bash command, localmost parses all rules and
 
 As a note, localmost supports only a **subset** of bash, falling back to `ask` where necessary. For example, a command with an expression like `$var` will always result in `ask`.
 
-The largest advantage of using ShellCheck is that it gives localmost the ability to parse complex command sequences, even when they contain pipes, redirects, `if` statements, `for` loops, etc. This is much more reliable than say a regex-based approach.
+The largest advantage of using ShellCheck is that it gives localmost the ability to parse complex command sequences, even when they contain pipes, redirects, `if` statements, `for` loops, etc. This is much more reliable than say a regular expression-based approach.
 
 ## Installation
 
@@ -111,6 +118,8 @@ In addition to that, meta expressions can also have quantifiers:
 > [!TIP]
 > As a special case, `@*` is a shortcut for `@arg*`, allowing you to write e.g. `echo @*`.
 
+Rule matching is mechanichally similar to regular expressions, meaning that the order of the expressions matters. For example, the rule `foo -a -b` will match `foo -a -b` but not `foo -b -a`. Although this limits the expressiveness of rules, it helps keeping the matching logic much simpler. Additionally, some commands like `find` may behave differently depending on the order of provided flags, so matching (e.g. allowing) different orders could potentially be incorrect. This depends entirely on the flag semantics of each command, which localmost is not aware of in any way.
+
 Additionally, each rule can also set the following keys:
 
 **`unless`**
@@ -122,7 +131,7 @@ List of expressions that **must not** appear anywhere in the input subcommand in
 Can be `true`, `false` or `"safe"` (default: `"safe"`):
 - `true` implies that the rule matches no matter which redirects the input sucommand has.
 - `false` implies that the rule only matches if the input subcommands has no redirects.
-- `"safe"` implies that the rule only matches if the input subcommand has only "safe" redirects, e.g. `> /dev/null`.
+- `"safe"` implies that the rule only matches if the input subcommand has only "safe", non-destructive redirects, e.g. `> /dev/null`.
 
 **`pipe`**
 
