@@ -169,6 +169,10 @@ echo 'ls -a' | localmost check --mode simple
 - An `unless` value of `["-a", "-b", "-c"]` can also be written as `["@{-a,-b,-c}"]`, making it a bit more compact.
 - See the [examples.md](docs/examples.md) file for some configuration file examples.
 
+## Related
+
+- [lord-kali](https://github.com/insidewhy/lord-kali): A similar tool built using Rust and `tree-sitter-bash`.
+
 ## License
 
 Distributed under the GNU General Public License, version 3.
