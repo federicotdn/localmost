@@ -193,17 +193,22 @@
       "allow": [
         {"rule": "echo @arg*"},
         {"rule": "grep @arg+"},
+        {"rule": "uname -s -n"},
         {"rule": "ls @arg*"}
       ]
     },
     "cases": [
       {"input": "echo foo | xargs grep", "expect": "allow"},
       {"input": "echo foo bar | xargs grep", "expect": "allow"},
+      {"input": "echo foo bar | xargs -0 grep", "expect": "ask"},
+      {"input": "echo foo bar | xargs grep -v", "expect": "allow"},
       {"input": "echo foo | xargs ls", "expect": "allow"},
       {"input": "echo foo | xargs rm", "expect": "ask"},
       {"input": "echo foo | xargs -I{} grep", "expect": "ask"},
-      {"input": "echo foo | xargs grep -r", "expect": "ask"},
-      {"input": "echo | xargs grep", "expect": "ask"},
+      {"input": "echo foo | xargs grep -r", "expect": "allow"},
+      {"input": "echo foo | xargs grep -r", "expect": "allow"},
+      {"input": "echo -n | xargs uname -s", "expect": "allow"},
+      {"input": "echo -n | xargs -s uname -s", "expect": "ask"},
       {"input": "echo foo; xargs grep", "expect": "ask"},
       {"input": "echo foo | xargs grep > /dev/null", "expect": "allow"},
       {"input": "echo foo | xargs grep > evil.txt", "expect": "ask"},

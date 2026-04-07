@@ -89,7 +89,7 @@ claudeCode =
 simpleText :: Proto
 simpleText =
   Proto
-    { pReadInput = Right <$> TIO.getLine,
+    { pReadInput = Right <$> TIO.getContents,
       pWritePolicy = putStrLn . map toLower . show,
       pWriteErrors = \errs -> ePutStrLn $ "[localmost] Error: " ++ show (intercalate ", " errs)
     }

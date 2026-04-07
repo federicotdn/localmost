@@ -306,6 +306,13 @@ spec = do
       computePolicy rt (sh "case x in a) echo hi;; esac") `shouldBe` Allow
       computePolicy rt (sh "case x in a) rm -rf /;; esac") `shouldBe` Ask
 
+    it "computes policies correctly (non-simple commands)" $ do
+      let rt = testRt [("echo @arg", Allow)]
+      computePolicy rt (sh "(( 1 + 1 ))") `shouldBe` Ask
+      computePolicy rt (sh "[[ 1 -eq 1 ]]") `shouldBe` Ask
+      computePolicy rt (sh "(( 1 + 1 )) && echo hi") `shouldBe` Allow
+      computePolicy rt (sh "[[ 1 -eq 1 ]] && echo hi") `shouldBe` Allow
+
     it "computes policies correctly (subshell)" $ do
       let rt = testRt [("echo @arg", Allow)]
       computePolicy rt (sh "(echo hi)") `shouldBe` Allow

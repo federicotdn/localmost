@@ -28,7 +28,6 @@ Note: these are a work-in-progress, and might not be 100% safe to use.
     {"rule": "man @arg"},
     {"rule": "col @*"},
     {"rule": "tree @path"},
-    {"rule": "sed @*", "unless": ["-i"]},
     {"rule": "uv lock @*"},
     {"rule": "uv sync @*"},
     {"rule": "uv run pytest @*"},

@@ -386,7 +386,7 @@ computePolicy rt input@(Script {sCommands = cmds}) =
 scriptPolicy :: Script -> Maybe Policy
 scriptPolicy Script {sCommands = cmds} =
   let policies = mapMaybe cmdPolicy cmds
-   in if length cmds == length policies
+   in if length cmds == length policies && not (null policies)
         then Just $ maximum policies
         else Nothing
 
@@ -409,8 +409,8 @@ applySafeXargs rules script = script {sCommands = go (sCommands script)}
       let echoArgs = drop 1 $ cmdParts echo -- Drop "echo".
           xargArgs = drop 1 $ cmdParts xargs -- Drop "xargs".
        in case xargArgs of
-            [part@(Literal l)]
-              | not ("-" `T.isPrefixOf` l) -> Just $ xargs {cmdParts = part : echoArgs}
+            (first@(Literal l) : rest)
+              | not ("-" `T.isPrefixOf` l) -> Just $ xargs {cmdParts = (first : rest) ++ echoArgs}
             _ -> Nothing
 
     isCommand cmd name = case cmdParts cmd of

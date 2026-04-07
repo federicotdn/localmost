@@ -35,9 +35,10 @@ The largest advantage of using ShellCheck is that it gives localmost the ability
 Note: Windows is not supported yet.
 
 **From source:**
-1. Install [ghcup](https://www.haskell.org/ghcup/), GHC and Cabal.
-2. Clone this repo: `git clone git@github.com:federicotdn/localmost.git && cd localmost`.
-3. Run `make install` (assumes `.ghcup/env` shim is set up).
+1. Install [ghcup](https://www.haskell.org/ghcup/).
+2. Install GHC and Cabal using `ghcup`. See [release.yaml](.github/workflows/release.yaml) for the exact versions.
+3. Clone this repo: `git clone git@github.com:federicotdn/localmost.git && cd localmost`.
+4. Run `make install` (assumes `.ghcup/env` shim is set up).
 
 Afterwards, ensure that localmost has been installed correctly:
 ```
@@ -159,7 +160,7 @@ Run `localmost --help` to see usage help.
 You can call `localmost check` manually in order to test out command policies:
 
 ```bash
-echo 'ls -a' | localmost check --mode simple
+echo 'ls -a' | localmost check --mode text
 ```
 
 ## Tips
