@@ -24,7 +24,7 @@ import Data.List (elemIndex)
 import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
-import Protocol (Proto (..))
+import Protocol (Input (..), PolicyOutput (..), Proto (..))
 import Shell
   ( comments,
     fullCommands,
@@ -591,8 +591,15 @@ check proto = do
         etext <- pReadInput proto
         case etext of
           Left errs -> pWriteErrors proto errs
-          Right cmd -> case astAsScript (parseShellScript cmd) False of
-            Right input -> pWritePolicy proto (computePolicy runtime input)
+          Right cmd -> case astAsScript (parseShellScript (iText cmd)) False of
+            Right input ->
+              let policy = computePolicy runtime input
+                  policy' = if not (iInteractive cmd) && policy == Ask then Deny else policy
+                  reason =
+                    if policy' == Deny
+                      then Just "[localmost] Command execution denied."
+                      else Nothing
+               in pWritePolicy proto (PolicyOutput policy' reason)
             Left errs -> pWriteErrors proto errs
       Left errs ->
         pWriteErrors

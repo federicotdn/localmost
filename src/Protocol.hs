@@ -1,5 +1,7 @@
 module Protocol
   ( Proto (..),
+    Input (..),
+    PolicyOutput (..),
     claudeCode,
     simpleText,
   )
@@ -23,12 +25,16 @@ import GHC.Generics (Generic)
 import Types (Errors, Policy (..))
 import Utils (ePutStrLn, jsonOptions, jsonOptionsLax)
 
+data Input = Input {iText :: Text, iInteractive :: Bool}
+
+data PolicyOutput = PolicyOutput {pPolicy :: Policy, pReason :: Maybe Text}
+
 -- | Proto separates the actual IO operations of reading and writing scripts, results and
 -- errors from the real validation logic. In theory, implementing the functions below could
 -- allow Localmost to work with other AI agents, or with any other tool.
 data Proto = Proto
-  { pReadInput :: IO (Either Errors Text),
-    pWritePolicy :: Policy -> IO (),
+  { pReadInput :: IO (Either Errors Input),
+    pWritePolicy :: PolicyOutput -> IO (),
     pWriteErrors :: Errors -> IO ()
   }
 
@@ -36,7 +42,8 @@ data Proto = Proto
 
 data HookEvent = HookEvent
   { hCwd :: Maybe Text, -- TODO: Unused
-    hTool_input :: HookEventInput
+    hTool_input :: HookEventInput,
+    hPermission_mode :: Maybe Text
   }
   deriving (Generic, Show)
 
@@ -59,8 +66,8 @@ newtype HookResponse = HookResponse {rHookSpecificOutput :: HookSpecificOutput} 
 
 instance ToJSON HookResponse where toJSON = genericToJSON jsonOptions
 
-policyResponse :: Policy -> HookResponse
-policyResponse p = HookResponse $ HookSpecificOutput "PreToolUse" p Nothing
+policyResponse :: PolicyOutput -> HookResponse
+policyResponse (PolicyOutput p reason) = HookResponse $ HookSpecificOutput "PreToolUse" p reason
 
 errResponse :: Errors -> HookResponse
 errResponse errs =
@@ -69,12 +76,18 @@ errResponse errs =
 writeResponse :: HookResponse -> IO ()
 writeResponse = BL.putStr . encode
 
-readInput :: IO (Either Errors Text)
+readInput :: IO (Either Errors Input)
 readInput = do
   input <- BL.getContents
   case eitherDecode input of
     Left err -> pure $ Left [pack err]
-    Right event -> pure $ Right $ iCommand (hTool_input event)
+    Right event ->
+      pure $
+        Right $
+          Input
+            { iText = iCommand (hTool_input event),
+              iInteractive = hPermission_mode event /= Just "acceptEdits"
+            }
 
 claudeCode :: Proto
 claudeCode =
@@ -89,7 +102,7 @@ claudeCode =
 simpleText :: Proto
 simpleText =
   Proto
-    { pReadInput = Right <$> TIO.getContents,
-      pWritePolicy = putStrLn . map toLower . show,
+    { pReadInput = Right . (`Input` True) <$> TIO.getContents,
+      pWritePolicy = putStrLn . map toLower . show . pPolicy,
       pWriteErrors = \errs -> ePutStrLn $ "[localmost] Error: " ++ show (intercalate ", " errs)
     }
