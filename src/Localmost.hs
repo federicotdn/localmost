@@ -599,7 +599,10 @@ check proto = do
                   policy' = if not (iInteractive cmd) && policy == Ask then Deny else policy
                   reason =
                     if policy' == Deny
-                      then Just "[localmost] Command execution denied."
+                      then
+                        Just $
+                          "[localmost] Command execution denied."
+                            <> "\nRun 'localmost config show' to see command permissions."
                       else Nothing
                in pWritePolicy proto (PolicyOutput policy' reason)
             Left errs -> pWriteErrors proto errs
