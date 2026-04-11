@@ -134,7 +134,8 @@ instance Show ParseRuleError where
 
 data Runtime = Runtime
   { rRules :: [Rule],
-    rSafeXargs :: Bool
+    rSafeXargs :: Bool,
+    rDefaultPolicy :: Policy
   }
   deriving (Show)
 
@@ -145,9 +146,6 @@ showToken (AST.OuterToken _ inner) =
   case words (show (void inner)) of
     (name : _) -> name
     [] -> "<Unknown>"
-
-defaultPolicy :: Policy
-defaultPolicy = Ask
 
 parseSingleCommand :: Text -> String -> ConfigRule -> (Command -> Either ParseRuleError a) -> Either ParseRuleError a
 parseSingleCommand text label r onSuccess =
@@ -187,10 +185,18 @@ parseConfig config =
       (allowErrs, pallow) = parse Allow (cAllow config)
       (denyErrs, pdeny) = parse Deny (cDeny config)
       allErrs = allowErrs ++ denyErrs
+      defaultPolicy = case fromMaybe Ask (cDefault config) of
+        Allow -> Ask -- Do now permit Allow as default policy.
+        other -> other
    in if null allErrs
         then
           let safeXargs = fromMaybe True (cAllowSafeXargs config)
-           in Right Runtime {rRules = pdeny ++ pallow, rSafeXargs = safeXargs}
+           in Right
+                Runtime
+                  { rRules = pdeny ++ pallow,
+                    rSafeXargs = safeXargs,
+                    rDefaultPolicy = defaultPolicy
+                  }
         else Left allErrs
 
 astAsScript :: ParseResult -> Bool -> Either Errors Script
@@ -378,6 +384,7 @@ computePolicy rt input@(Script {sCommands = cmds}) =
       -- We only work on purely literal input commands, i.e. no variables,
       -- arithmetic, brace expansion, etc.
       allLiteral = all cmdIsLiteral cmds
+      defaultPolicy = rDefaultPolicy rt
    in if allLiteral
         then fromMaybe defaultPolicy (scriptPolicy input'')
         else defaultPolicy

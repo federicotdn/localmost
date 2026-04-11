@@ -14,7 +14,7 @@ import Data.Text (Text, pack)
 import GHC.Generics (Generic)
 import System.Directory (XdgDirectory (XdgConfig), createDirectoryIfMissing, doesFileExist, getXdgDirectory)
 import System.FilePath (takeDirectory, (</>))
-import Types (PipeAccess (..), RedirectAccess (..))
+import Types (PipeAccess (..), Policy, RedirectAccess (..))
 import Utils (jsonOptions, tryIO)
 
 data ConfigRule = ConfigRule
@@ -33,6 +33,7 @@ data Config = Config
   { cAllow :: Maybe [ConfigRule],
     cDeny :: Maybe [ConfigRule],
     cAllowSafeXargs :: Maybe Bool,
+    cDefault :: Maybe Policy,
     cPath :: Maybe FilePath
   }
   deriving (Generic, Show)
@@ -47,7 +48,7 @@ configPath = do
   pure $ dir </> "config.json"
 
 defaultConfig :: Config
-defaultConfig = Config Nothing Nothing Nothing Nothing
+defaultConfig = Config Nothing Nothing Nothing Nothing Nothing
 
 initConfig :: IO ()
 initConfig = do
@@ -58,7 +59,14 @@ initConfig = do
     else do
       createDirectoryIfMissing True (takeDirectory path)
       let rule = ConfigRule {rRule = "echo @arg*", rPipe = Nothing, rRedirect = Nothing, rUnless = Nothing}
-      let emptyConfig = Config {cAllow = Just [rule], cDeny = Nothing, cPath = Nothing, cAllowSafeXargs = Nothing}
+      let emptyConfig =
+            Config
+              { cAllow = Just [rule],
+                cDeny = Nothing,
+                cPath = Nothing,
+                cDefault = Nothing,
+                cAllowSafeXargs = Nothing
+              }
       BL.writeFile path (encode emptyConfig)
       putStrLn $ "Created configuration file at " ++ path ++ "."
 

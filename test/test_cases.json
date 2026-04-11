@@ -227,5 +227,27 @@
     "cases": [
       {"input": "echo foo | xargs grep", "expect": "ask"}
     ]
+  },
+  {
+    "name": "default policy deny",
+    "config": {
+      "allow": [
+        {"rule": "echo @arg*"}
+      ],
+      "default": "deny"
+    },
+    "cases": [
+      {"input": "echo foo", "expect": "allow"},
+      {"input": "other", "expect": "deny"}
+    ]
+  },
+  {
+    "name": "default policy allow (ask)",
+    "config": {
+      "default": "allow"
+    },
+    "cases": [
+      {"input": "echo foo", "expect": "ask"}
+    ]
   }
 ]
