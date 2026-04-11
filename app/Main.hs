@@ -2,7 +2,7 @@ module Main where
 
 import Config (initConfig)
 import Data.Version (showVersion)
-import Localmost (ast, check, validate)
+import Localmost (ast, check, showConfig, validate)
 import Options.Applicative
   ( Parser,
     command,
@@ -30,15 +30,22 @@ newtype AstOpts = AstOpts {aoRule :: Bool}
 
 newtype CheckOpts = CheckOpts {coMode :: String}
 
-data Command = Check CheckOpts | Validate | Init | Ast AstOpts
+data Command = Check CheckOpts | Config ConfigCommand | Init | Ast AstOpts
+
+data ConfigCommand = ConfigValidate | ConfigShow
 
 newtype Options = Options {oCommand :: Command}
 
 checkCommand :: Parser Command
 checkCommand = Check . CheckOpts <$> option str (long "mode" <> short 'm' <> value "claude" <> help "Protocol mode: claude, text")
 
-validateCommand :: Parser Command
-validateCommand = pure Validate
+configCommand :: Parser Command
+configCommand =
+  Config
+    <$> hsubparser
+      ( command "validate" (info (pure ConfigValidate) (progDesc "Validate the config.json file"))
+          <> command "show" (info (pure ConfigShow) (progDesc "Print the contents of the config.json file"))
+      )
 
 initCommand :: Parser Command
 initCommand = pure Init
@@ -51,7 +58,7 @@ parser =
   Options
     <$> hsubparser
       ( command "check" (info checkCommand (progDesc "Check if bash command should be run"))
-          <> command "validate" (info validateCommand (progDesc "Validate the config.json file"))
+          <> command "config" (info configCommand (progDesc "Inspect or validate the config.json file"))
           <> command "init" (info initCommand (progDesc "Create a default config.json file"))
           <> command "ast" (info astCommand (progDesc "Parse a script and print its AST (debugging)"))
       )
@@ -71,6 +78,7 @@ main = do
             "text" -> simpleText
             _ -> claudeCode
        in check proto
-    Validate -> validate
+    Config ConfigValidate -> validate
+    Config ConfigShow -> showConfig
     Init -> initConfig
     Ast astOpts -> ast (aoRule astOpts)

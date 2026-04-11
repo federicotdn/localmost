@@ -86,7 +86,7 @@ Here's a quick example of what a customized configuration file could look like:
 }
 ```
 
-You can always validate your configuration file by running `localmost validate`. If your configuration file is not valid or is not present, localmost will default to the `ask` policy.
+You can always validate your configuration file by running `localmost config validate`. If your configuration file is not valid or is not present, localmost will default to the `ask` policy.
 
 Following is an explanation of each top-level key for `config.json`:
 

@@ -2,6 +2,7 @@ module Localmost
   ( ast,
     check,
     validate,
+    showConfig,
     parseConfig,
     computePolicy,
     astAsScript,
@@ -36,6 +37,7 @@ import Shell
 import ShellCheck.AST (Id)
 import ShellCheck.AST qualified as AST
 import ShellCheck.Interface (ParseResult (..))
+import System.Directory (doesFileExist)
 import System.Exit (exitFailure)
 import System.FilePath (isValid)
 import Text.Parsec (Parsec)
@@ -608,9 +610,19 @@ check proto = do
               "Found "
                 ++ show (length errs)
                 ++ " rule error(s) in configuration file.\n"
-                ++ "Run 'localmost validate' to see more details."
+                ++ "Run 'localmost config validate' to see more details."
           ]
     Left err -> pWriteErrors proto [err]
+
+showConfig :: IO ()
+showConfig = do
+  path <- configPath
+  exists <- doesFileExist path
+  if not exists
+    then do
+      ePutStrLn $ "No configuration file found at " ++ path ++ "."
+      exitFailure
+    else readFile path >>= putStr
 
 validate :: IO ()
 validate = do
