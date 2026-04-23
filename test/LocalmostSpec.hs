@@ -113,10 +113,10 @@ spec = do
 
     it "computes policies correctly (command with non-literals)" $ do
       let rt = testRt [("echo @*", Allow)]
-      computePolicy rt (sh "echo $arg") `shouldBe` Ask
-      computePolicy rt (sh "echo ${arg,}") `shouldBe` Ask
-      computePolicy rt (sh "echo a{rg,bc}") `shouldBe` Ask
-      computePolicy rt (sh "echo $((1 + 1))") `shouldBe` Ask
+      computePolicy rt (sh "echo $arg") `shouldBe` Allow
+      computePolicy rt (sh "echo ${arg,}") `shouldBe` Allow
+      computePolicy rt (sh "echo a{rg,bc}") `shouldBe` Allow
+      computePolicy rt (sh "echo $((1 + 1))") `shouldBe` Allow
 
     it "computes policies correctly (command, deny)" $ do
       let rt = testRt [("echo", Allow), ("evil", Deny)]

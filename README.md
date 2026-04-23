@@ -22,8 +22,6 @@ When Claude Code wants to execute a bash command, localmost parses all rules and
 2. For each one, it checks for matches against all the `deny` and `allow` rules. If any `deny` rule matches, the subcommand is denied. Otherwise, if any `allow` rule matches, the subcommand is allowed.
 3. Finally, if **any** subcommand is denied, then the resulting policy for the input command is `deny`. If **all** subcommands are allowed, then the result is `allow`. Otherwise, the result is `ask`.
 
-As a note, localmost supports only a **subset** of bash, falling back to `ask` where necessary. For example, a command with an expression like `$var` will always result in `ask`.
-
 The largest advantage of using ShellCheck is that it gives localmost the ability to parse complex command sequences, even when they contain pipes, redirects, `if` statements, `for` loops, etc. This is much more reliable than say a regular expression-based approach.
 
 ## Installation
@@ -98,15 +96,15 @@ Rules are written using a special syntax, which is syntatically still bash, but 
 
 Here's a full overview of the rules syntax:
 
-| Meta expression | Meaning                                                                                                                                           |
-|-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `abc`           | Not really a meta expression per se. A literal string `abc` will match `abc`, `'abc'` and `"abc"`.                                                |
-| `@arg`          | Matches any argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument.              |
-| `@path`         | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths. |
-| `@int`          | Matches an argument containing an integer value, e.g. `1234`.                                                                                     |
-| `@@`            | Matches a literal `@` character.                                                                                                                  |
-| `@{v1,v2,v3}`   | Choice: matches one of `v1`, `v2` or `v3`.                                                                                                        |
-| `@(v1 v2 v3)`   | Group: matches `v1 v2 v3` in that specific order.                                                                                                 |
+| Meta expression | Meaning                                                                                                                                                                                                                                                                              |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `abc`           | Not really a meta expression per se. A literal string `abc` will match `abc`, `'abc'` and `"abc"`.                                                                                                                                                                                   |
+| `@arg`          | Matches any single argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument. Note that an expression like `$var` will not match with `@arg` because there's no guarantee that it will expand to exactly one argument. |
+| `@path`         | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths.                                                                                                                                    |
+| `@int`          | Matches an argument containing an integer value, e.g. `1234`.                                                                                                                                                                                                                        |
+| `@@`            | Matches a literal `@` character.                                                                                                                                                                                                                                                     |
+| `@{v1,v2,v3}`   | Choice: matches one of `v1`, `v2` or `v3`.                                                                                                                                                                                                                                           |
+| `@(v1 v2 v3)`   | Group: matches `v1 v2 v3` in that specific order.                                                                                                                                                                                                                                    |
 
 In addition to that, meta expressions can also have quantifiers:
 
@@ -146,7 +144,9 @@ Can be `true`, `false`, `"in"` or `"out"` (default: `true`):
 
 Can be set to `true` or `false` (default: `true`).
 
-When set to `true`, commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*` (in order to allow for the `echo` to run).
+When set to `true`:
+- Commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*` (in order to allow for the `echo` to run).
+- Commands in the shape of `CMD | xargs PROG` will be marked as allows if and only if there's a `PROG @arg*` rule (and if `CMD` itself is allowed).
 
 If set to `false`, no special processing will be done for these situations.
 

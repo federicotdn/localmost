@@ -105,15 +105,68 @@
     ]
   },
   {
+    "name": "match-any",
+    "config": {
+      "allow": [
+        {"rule": "c1 @arg*"},
+        {"rule": "c2 @arg* @int"}
+      ]
+    },
+    "cases": [
+      {"input": "c1", "expect": "allow"},
+      {"input": "c1 x y", "expect": "allow"},
+      {"input": "c1 x y $(c1)", "expect": "allow"},
+      {"input": "c1 x y $(c1) $test", "expect": "allow"},
+      {"input": "c2 x 123", "expect": "allow"},
+      {"input": "c2 x y 123", "expect": "allow"},
+      {"input": "c2 x y $(c1)", "expect": "ask"},
+      {"input": "c2 x y $(c1) 123", "expect": "ask"}
+    ]
+  },
+  {
+    "name": "splitting",
+    "config": {
+      "allow": [
+        {"rule": "c @arg"},
+        {"rule": "foo"}
+      ],
+      "deny": [
+        {"rule": "evil x"}
+      ]
+    },
+    "cases": [
+      {"input": "c a", "expect": "allow"},
+      {"input": "c '$a'", "expect": "allow"},
+      {"input": "c \"$a\"", "expect": "allow"},
+      {"input": "c \"$(foo)\"", "expect": "allow"},
+      {"input": "c \"hello world\"", "expect": "allow"},
+      {"input": "c $var", "expect": "ask"},
+      {"input": "c ${var}", "expect": "ask"},
+      {"input": "c $(foo)", "expect": "ask"},
+      {"input": "c `foo`", "expect": "ask"},
+      {"input": "c *.json", "expect": "ask"},
+      {"input": "evil x", "expect": "deny"},
+      {"input": "evil y", "expect": "ask"},
+      {"input": "evil *.json", "expect": "deny"},
+      {"input": "evil $var", "expect": "deny"}
+    ]
+  },
+  {
     "name": "git",
     "config": {
-      "allow": [{"rule": "git @(-C @arg)? @{log,status,diff,show,blame} @arg*"}]
+      "allow": [
+        {"rule": "git @(-C @arg)? @{log,status,diff,show,blame} @arg*"},
+        {"rule": "good-get-branch-name"}
+      ]
     },
     "cases": [
       {"input": "git log", "expect": "allow"},
       {"input": "git log mybranch", "expect": "allow"},
-      {"input": "git log $mybranch", "expect": "ask"},
-      {"input": "git log $(get-branch-name)", "expect": "ask"},
+      {"input": "git log \"$mybranch\"", "expect": "allow"},
+      {"input": "git log \"$mybranch\"", "expect": "allow"},
+      {"input": "git log $mybranch", "expect": "allow"},
+      {"input": "git log $(good-get-branch-name)", "expect": "allow"},
+      {"input": "git log $(bad-get-branch-name)", "expect": "ask"},
       {"input": "git -C . log", "expect": "allow"},
       {"input": "git rm", "expect": "ask"},
       {"input": "git -C . rm", "expect": "ask"}
@@ -194,7 +247,12 @@
         {"rule": "echo @arg*"},
         {"rule": "grep @arg+"},
         {"rule": "uname -s -n"},
-        {"rule": "ls @arg*"}
+        {"rule": "ls @arg*"},
+        {"rule": "cat @path"},
+        {"rule": "find @path -name @arg"}
+      ],
+      "deny": [
+        {"rule": "evil"}
       ]
     },
     "cases": [
@@ -212,7 +270,30 @@
       {"input": "echo foo; xargs grep", "expect": "ask"},
       {"input": "echo foo | xargs grep > /dev/null", "expect": "allow"},
       {"input": "echo foo | xargs grep > evil.txt", "expect": "ask"},
-      {"input": "echo foo | xargs", "expect": "ask"}
+      {"input": "echo foo | xargs", "expect": "ask"},
+      {"input": "find . -name '*.txt' | xargs grep", "expect": "ask"},
+      {"input": "find . -name '*.txt' | xargs grep -r", "expect": "ask"},
+      {"input": "find . -name '*.txt' | xargs rm", "expect": "ask"},
+      {"input": "find . -name '*.txt' | xargs -0 grep", "expect": "ask"},
+      {"input": "find . -name '*.txt' | xargs ls", "expect": "allow"},
+      {"input": "cat files.txt | xargs echo", "expect": "allow"},
+      {"input": "cat files.txt | xargs grep", "expect": "ask"},
+      {"input": "cat files.txt | xargs", "expect": "ask"},
+      {"input": "evil | xargs echo", "expect": "deny"}
+    ]
+  },
+  {
+    "name": "safe xargs (echo denied)",
+    "config": {
+      "allow": [
+        {"rule": "foo @arg*"}
+      ],
+      "deny": [
+        {"rule": "echo @arg*"}
+      ]
+    },
+    "cases": [
+      {"input": "echo test | xargs foo", "expect": "deny"}
     ]
   },
   {

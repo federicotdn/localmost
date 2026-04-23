@@ -22,7 +22,7 @@ import Data.Either (partitionEithers)
 import Data.Foldable (for_)
 import Data.IntSet qualified as IntSet
 import Data.List (elemIndex)
-import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
 import Protocol (Input (..), PolicyOutput (..), Proto (..))
@@ -36,6 +36,7 @@ import Shell
   )
 import ShellCheck.AST (Id)
 import ShellCheck.AST qualified as AST
+import ShellCheck.ASTLib (willSplit)
 import ShellCheck.Interface (ParseResult (..))
 import System.Directory (doesFileExist)
 import System.Exit (exitFailure)
@@ -66,6 +67,7 @@ instance Show Count where
 
 data Part
   = Token AST.Token
+  | Dynamic
   | Literal Text
   | Choice [Part]
   | Group [Part]
@@ -78,6 +80,7 @@ data Part
 
 instance Show Part where
   show (Token t) = "Token (" ++ show (AST.getId t) ++ ") (" ++ showToken t ++ ")"
+  show Dynamic = "Dynamic"
   show (Literal t) = unpack $ "Literal " <> t
   show (Choice list) = "Choice " ++ show list
   show (Group list) = "Group " ++ show list
@@ -377,20 +380,12 @@ parseQuantifier s part = case s of
 -- and a script, decides on a policy. Note the function does not depend on
 -- IO as all IO is done from other functions.
 computePolicy :: Runtime -> Script -> Policy
-computePolicy rt input@(Script {sCommands = cmds}) =
+computePolicy rt input =
   let rules = rRules rt
       input' = applyRules rules input
       input'' = if rSafeXargs rt then applySafeXargs rules input' else input'
-      -- We only work on purely literal input commands, i.e. no variables,
-      -- arithmetic, brace expansion, etc.
-      allLiteral = all cmdIsLiteral cmds
       defaultPolicy = rDefaultPolicy rt
-   in if allLiteral
-        then fromMaybe defaultPolicy (scriptPolicy input'')
-        else defaultPolicy
-  where
-    cmdIsLiteral Command {cmdParts = parts} =
-      length [() | (Literal _) <- parts] == length parts
+   in fromMaybe defaultPolicy (scriptPolicy input'')
 
 scriptPolicy :: Script -> Maybe Policy
 scriptPolicy Script {sCommands = cmds} =
@@ -404,7 +399,7 @@ applySafeXargs rules script = script {sCommands = go (sCommands script)}
   where
     go (c1 : c2 : rest) =
       let continue = c1 : go (c2 : rest)
-       in if isCommand c1 "echo" && isCommand c2 "xargs" && cmdPipelineId c1 == cmdPipelineId c2
+       in if isCommand c2 "xargs" && cmdPipelineId c1 == cmdPipelineId c2
             then case buildTemp c1 c2 of
               Just temp ->
                 case applyRules rules (Script {sCommands = [temp]}) of
@@ -414,12 +409,15 @@ applySafeXargs rules script = script {sCommands = go (sCommands script)}
             else continue
     go cmds = cmds
 
-    buildTemp echo xargs =
-      let echoArgs = drop 1 $ cmdParts echo -- Drop "echo".
-          xargArgs = drop 1 $ cmdParts xargs -- Drop "xargs".
+    buildTemp source xargs =
+      let xargArgs = drop 1 $ cmdParts xargs -- Drop "xargs".
+          suffix =
+            if isCommand source "echo"
+              then drop 1 $ cmdParts source -- Drop "echo", take the rest.
+              else [Dynamic] -- Command may produce anything.
        in case xargArgs of
             (first@(Literal l) : rest)
-              | not ("-" `T.isPrefixOf` l) -> Just $ xargs {cmdParts = (first : rest) ++ echoArgs}
+              | not ("-" `T.isPrefixOf` l) -> Just $ xargs {cmdParts = (first : rest) ++ suffix}
             _ -> Nothing
 
     isCommand cmd name = case cmdParts cmd of
@@ -453,11 +451,9 @@ commandsMatch rule@(Rule {rCommand = cmd}) input =
 
 exceptsMatch :: Rule -> Command -> Bool
 exceptsMatch Rule {rExcepts = excepts} input =
-  let cmdHasNonConsts = not $ all isLiteral [tok | (Token tok) <- cmdParts input]
-   in not (null excepts) && (cmdHasNonConsts || any (`matchOne` input) excepts)
+  not (null excepts) && any (`matchOne` input) excepts
   where
     matchOne (Except parts) cmd = allPartsMatch parts (cmdParts cmd) Flexible
-    isLiteral tok = isJust $ literalText tok False
 
 pipesMatch :: Rule -> Command -> Bool
 pipesMatch Rule {rPipeAccess = pa} input = case pa of
@@ -485,7 +481,7 @@ redirectsMatch Rule {rRedirectAccess = ra} input = case ra of
 allPartsMatch :: [Part] -> [Part] -> Mode -> Bool
 allPartsMatch rparts = execute (compile rparts)
 
-data Instr = Match Part | Fork Int | Jump Int | Accept deriving (Show, Eq)
+data Instr = Match Part | MatchAny | Fork Int | Jump Int | Accept deriving (Show, Eq)
 
 compile :: [Part] -> [Instr]
 compile parts = emit parts ++ [Accept]
@@ -493,6 +489,7 @@ compile parts = emit parts ++ [Accept]
     emit [] = []
     emit (Choice alts : rest) = emitChoice alts ++ emit rest
     emit (Group gparts : rest) = emit gparts ++ emit rest
+    emit [Quant Arg (Count 0 Nothing)] = [MatchAny]
     emit (Quant inner c : rest) = emitQuant inner c ++ emit rest
     emit (p : rest) = Match p : emit rest
 
@@ -536,11 +533,12 @@ execute instrs iparts mode = go (IntSet.singleton 0) iparts
     expand pc = case instrAt pc of
       Just (Fork off) -> IntSet.fromList [pc + 1, pc + off]
       Just (Jump off) -> IntSet.singleton (pc + off)
+      Just MatchAny -> IntSet.fromList [pc, pc + 1]
       _ -> IntSet.singleton pc
 
-    -- Try consuming one token at a given state
     step tok pc = case instrAt pc of
       Just (Match p) -> [pc + 1 | partMatches p tok mode]
+      Just MatchAny -> [pc]
       _ -> []
 
 partMatches :: Part -> Part -> Mode -> Bool
@@ -555,8 +553,12 @@ partMatches rule input mode = case input of
       -- Should not happen as all rule parts are
       -- either meta vars, or literals.
       _ -> False
-  -- Should not happen as all input commands parts
-  -- are exclusively literals.
+  Dynamic -> False
+  Token tok -> case mode of
+    Flexible -> True
+    Strict -> case rule of
+      Arg -> not (willSplit tok)
+      _ -> False
   _ -> False
 
 textMatches :: Text -> Text -> Mode -> Bool
