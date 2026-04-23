@@ -149,7 +149,7 @@ Can be set to `true` or `false` (default: `true`).
 
 When set to `true`:
 - Commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*` (in order to allow for the `echo` to run).
-- Commands in the shape of `PROG1 ARGS1 | xargs PROG2 ARGS2` will be marked as allows if and only if there's an equivalent rule to `PROG2 ARGS2 @arg*` (and if `PROG1 ARGS1` itself is allowed).
+- Commands in the shape of `PROG1 ARGS1 | xargs PROG2 ARGS2` will be marked as allowed if and only if there's an equivalent rule to `PROG2 ARGS2 @arg*` (and if `PROG1 ARGS1` itself is allowed).
 
 If set to `false`, no special processing will be done for these situations.
 
