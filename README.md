@@ -26,13 +26,16 @@ The largest advantage of using ShellCheck is that it gives localmost the ability
 
 ## Installation
 
-**Pre-built binaries:**
+Note: Windows is not supported yet.
+
+**Manually using pre-built binaries**
 1. Head over to the [releases](https://github.com/federicotdn/localmost/releases) section.
 2. Download the latest one for your OS and CPU architecture, and place it somewhere in `$PATH`.
 
-Note: Windows is not supported yet.
+**Using [mise](https://mise.jdx.dev/)**
+1. Run `mise use -g github:federicotdn/localmost@latest`.
 
-**From source:**
+**From source**
 1. Install [ghcup](https://www.haskell.org/ghcup/).
 2. Install GHC and Cabal using `ghcup`. See [release.yaml](.github/workflows/release.yaml) for the exact versions.
 3. Clone this repo: `git clone git@github.com:federicotdn/localmost.git && cd localmost`.
@@ -146,7 +149,7 @@ Can be set to `true` or `false` (default: `true`).
 
 When set to `true`:
 - Commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*` (in order to allow for the `echo` to run).
-- Commands in the shape of `CMD | xargs PROG` will be marked as allows if and only if there's a `PROG @arg*` rule (and if `CMD` itself is allowed).
+- Commands in the shape of `PROG1 ARGS1 | xargs PROG2 ARGS2` will be marked as allows if and only if there's an equivalent rule to `PROG2 ARGS2 @arg*` (and if `PROG1 ARGS1` itself is allowed).
 
 If set to `false`, no special processing will be done for these situations.
 
@@ -165,7 +168,6 @@ echo 'ls -a' | localmost check --mode text
 
 ## Tips
 
-- Since localmost is an external process, you don't need to reload your Claude Code session in order for any configuration changes to be picked up.
 - Only use `@arg*`/`@*` for commands that you are very familiar with, and are sure that cannot be used in a destructive way, e.g. `echo` or `ls`. If you do use `@arg`/`@*`, consider adding `unless` clauses as well in order to un-match specific flags.
 - An `unless` value of `["-a", "-b", "-c"]` can also be written as `["@{-a,-b,-c}"]`, making it a bit more compact.
 - See the [examples.md](docs/examples.md) file for some configuration file examples.
