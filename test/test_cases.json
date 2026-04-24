@@ -120,7 +120,8 @@
       {"input": "c2 x 123", "expect": "allow"},
       {"input": "c2 x y 123", "expect": "allow"},
       {"input": "c2 x y $(c1)", "expect": "ask"},
-      {"input": "c2 x y $(c1) 123", "expect": "ask"}
+      {"input": "c2 x y $foo 123", "expect": "allow"},
+      {"input": "c2 x y $(c1) 123", "expect": "allow"}
     ]
   },
   {
@@ -245,6 +246,7 @@
     "config": {
       "allow": [
         {"rule": "echo @arg*"},
+        {"rule": "rm -I @arg*"},
         {"rule": "grep @arg+"},
         {"rule": "uname -s -n"},
         {"rule": "ls @arg*"},
@@ -276,6 +278,12 @@
       {"input": "find . -name '*.txt' | xargs rm", "expect": "ask"},
       {"input": "find . -name '*.txt' | xargs -0 grep", "expect": "ask"},
       {"input": "find . -name '*.txt' | xargs ls", "expect": "allow"},
+      {"input": "cat files.txt | xargs", "expect": "ask"},
+      {"input": "cat files.txt | xargs rm", "expect": "ask"},
+      {"input": "cat files.txt | xargs rm -I", "expect": "allow"},
+      {"input": "cat files.txt | xargs rm -r -I", "expect": "ask"},
+      {"input": "cat files.txt | xargs rm -rI", "expect": "ask"},
+      {"input": "cat files.txt | xargs rm -I foo.txt", "expect": "allow"},
       {"input": "cat files.txt | xargs echo", "expect": "allow"},
       {"input": "cat files.txt | xargs grep", "expect": "ask"},
       {"input": "cat files.txt | xargs", "expect": "ask"},

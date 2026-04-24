@@ -489,7 +489,7 @@ compile parts = emit parts ++ [Accept]
     emit [] = []
     emit (Choice alts : rest) = emitChoice alts ++ emit rest
     emit (Group gparts : rest) = emit gparts ++ emit rest
-    emit [Quant Arg (Count 0 Nothing)] = [MatchAny]
+    emit (Quant Arg (Count 0 Nothing) : rest) = MatchAny : emit rest
     emit (Quant inner c : rest) = emitQuant inner c ++ emit rest
     emit (p : rest) = Match p : emit rest
 
