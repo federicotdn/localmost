@@ -286,6 +286,12 @@ spec = do
       computePolicy rt (sh ". x") `shouldBe` Allow
       computePolicy rt (sh ". x y") `shouldBe` Ask
 
+    it "computes policies correctly (literal --)" $ do
+      let rt = testRt [("foo -- @arg+", Allow)]
+      computePolicy rt (sh "foo -- bar") `shouldBe` Allow
+      computePolicy rt (sh "foo - bar") `shouldBe` Ask
+      computePolicy rt (sh "foo bar") `shouldBe` Ask
+
     it "computes policies correctly (if)" $ do
       let rt = testRt [("echo @arg", Allow), ("true", Allow)]
       computePolicy rt (sh "if true; then echo hi; fi") `shouldBe` Allow
