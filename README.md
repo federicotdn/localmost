@@ -101,7 +101,6 @@ Here's a full overview of the rules syntax:
 
 | Meta expression | Meaning                                                                                                                                                                                                                                                                              |
 |-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `abc`           | Not really a meta expression per se. A literal string `abc` will match `abc`, `'abc'` and `"abc"`.                                                                                                                                                                                   |
 | `@arg`          | Matches any single argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument. Note that an expression like `$var` will not match with `@arg` because there's no guarantee that it will expand to exactly one argument. |
 | `@path`         | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths.                                                                                                                                    |
 | `@int`          | Matches an argument containing an integer value, e.g. `1234`.                                                                                                                                                                                                                        |
@@ -174,6 +173,7 @@ echo 'ls -a' | localmost check --mode text
 
 - Only use `@arg*`/`@*` for commands that you are very familiar with, and are sure that cannot be used in a destructive way, e.g. `echo` or `ls`. If you do use `@arg`/`@*`, consider adding `unless` clauses as well in order to un-match specific flags.
 - An `unless` value of `["-a", "-b", "-c"]` can also be written as `["@{-a,-b,-c}"]`, making it a bit more compact.
+- Use `@sub` for commands that take other commands as input, e.g. `watch`, `nohup`, etc.
 - See the [examples.md](docs/examples.md) file for some configuration file examples.
 
 ## Related
