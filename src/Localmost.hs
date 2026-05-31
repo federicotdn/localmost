@@ -21,7 +21,7 @@ import Control.Monad (void, when)
 import Data.Either (partitionEithers)
 import Data.Foldable (for_)
 import Data.IntSet qualified as IntSet
-import Data.List (elemIndex)
+import Data.List (elemIndex, inits, tails)
 import Data.Maybe (fromMaybe, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
@@ -511,8 +511,8 @@ commandsMatch :: Bool -> [Rule] -> Rule -> Command -> Bool
 commandsMatch allowSub rules rule@(Rule {rCommand = cmd}) input =
   let mode = if rPolicy rule == Allow then Strict else Flexible
       partsMatch = case cmdHasTrailingSub cmd of
-        Just prefix -> subMatches allowSub rules prefix input mode
-        Nothing -> allPartsMatch (cmdParts cmd) (cmdParts input) mode
+        Just prefix -> allowSub && allPartsAndSubMatch rules prefix input mode -- @sub in rule.
+        Nothing -> allPartsMatch (cmdParts cmd) (cmdParts input) mode -- no @sub in rule.
    in partsMatch
         && pipesMatch rule input
         && redirectsMatch rule input
@@ -524,17 +524,12 @@ cmdHasTrailingSub cmd = case reverse (cmdParts cmd) of
   (Sub : rest) -> Just (reverse rest)
   _ -> Nothing
 
-subMatches :: Bool -> [Rule] -> [Part] -> Command -> Mode -> Bool
-subMatches allowSub rules prefix input mode =
-  allowSub
-    && any matchAt (splitPoints (cmdParts input))
+allPartsAndSubMatch :: [Rule] -> [Part] -> Command -> Mode -> Bool
+allPartsAndSubMatch rules prefix input mode =
+  any matchAt (splitPoints (cmdParts input))
   where
-    -- @sub must consume at least one input word (the sub-command name).
-    splitPoints iparts = [splitAt n iparts | n <- [0 .. length iparts - 1]]
-    matchAt (pre, post) =
-      not (null post)
-        && allPartsMatch prefix pre mode
-        && subIsAllowed rules post
+    splitPoints iparts = init (zip (inits iparts) (tails iparts))
+    matchAt (pre, post) = allPartsMatch prefix pre mode && subIsAllowed rules post
 
 exceptsMatch :: Rule -> Command -> Bool
 exceptsMatch Rule {rExcepts = excepts} input =

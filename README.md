@@ -105,7 +105,7 @@ Here's a full overview of the rules syntax:
 | `@arg`          | Matches any single argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument. Note that an expression like `$var` will not match with `@arg` because there's no guarantee that it will expand to exactly one argument. |
 | `@path`         | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths.                                                                                                                                    |
 | `@int`          | Matches an argument containing an integer value, e.g. `1234`.                                                                                                                                                                                                                        |
-| `@sub`          | Matches only a command that would result in an `allow` policy. Must be the last expression in a rule, and consumes the rest of the command. Example rule: `watch -n @int @sub`.                                                                                                                                                                                                                        |
+| `@sub`          | Matches only a command that would result in an `allow` policy. Must be the last expression in a rule, and consumes the rest of the command. Example rule: `watch -n @int @sub`.                                                                                                      |
 | `@@`            | Matches a literal `@` character.                                                                                                                                                                                                                                                     |
 | `@{v1,v2,v3}`   | Choice: matches one of `v1`, `v2` or `v3`.                                                                                                                                                                                                                                           |
 | `@(v1 v2 v3)`   | Group: matches `v1 v2 v3` in that specific order.                                                                                                                                                                                                                                    |
@@ -117,6 +117,9 @@ In addition to that, meta expressions can also have quantifiers:
 | `?`        | Zero or one time. E.g. `@arg?`.      |
 | `+`        | One or more times. E.g. `@{-a,-b}+`. |
 | `*`        | Zero or more times. E.g. `@int*`     |
+
+> [!NOTE]
+> The `@sub` meta expression does not accept quantifiers.
 
 > [!TIP]
 > As a special case, `@*` is a shortcut for `@arg*`, allowing you to write e.g. `echo @*`.
