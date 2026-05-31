@@ -340,12 +340,12 @@
     ]
   },
   {
-    "name": "@cmd meta var",
+    "name": "@sub meta var",
     "config": {
       "allow": [
         {"rule": "echo @arg*"},
-        {"rule": "nohup @cmd"},
-        {"rule": "watch @(-n @int)? @cmd"}
+        {"rule": "nohup @sub"},
+        {"rule": "watch @(-n @int)? @sub"}
       ],
       "deny": [
         {"rule": "evil @arg*"}
