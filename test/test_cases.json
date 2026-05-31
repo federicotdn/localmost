@@ -338,5 +338,33 @@
     "cases": [
       {"input": "echo foo", "expect": "ask"}
     ]
+  },
+  {
+    "name": "@cmd meta var",
+    "config": {
+      "allow": [
+        {"rule": "echo @arg*"},
+        {"rule": "nohup @cmd"},
+        {"rule": "watch @(-n @int)? @cmd"}
+      ],
+      "deny": [
+        {"rule": "evil @arg*"}
+      ]
+    },
+    "cases": [
+      {"input": "nohup", "expect": "ask"},
+      {"input": "nohup echo", "expect": "allow"},
+      {"input": "watch echo foo", "expect": "allow"},
+      {"input": "watch -n 10 echo foo", "expect": "allow"},
+      {"input": "watch -n echo foo", "expect": "ask"},
+      {"input": "nohup nohup echo", "expect": "ask"},
+      {"input": "nohup echo foo", "expect": "allow"},
+      {"input": "nohup evil", "expect": "ask"},
+      {"input": "echo echo foo bar | xargs nohup", "expect": "allow"},
+      {"input": "echo evil bar | xargs nohup", "expect": "ask"},
+      {"input": "nohup echo > /dev/null", "expect": "allow"},
+      {"input": "nohup echo > evil.txt", "expect": "ask"},
+      {"input": "nohup echo | echo", "expect": "allow"}
+    ]
   }
 ]

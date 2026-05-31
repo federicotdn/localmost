@@ -21,7 +21,7 @@ common shared
         ghc-options:    -O1
     default-language:   GHC2021
     default-extensions: OverloadedStrings
-    build-depends:      base ^>=4.21.0.0
+    build-depends:      base ^>=4.22.0.0
 
 library
     import:           shared

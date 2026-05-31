@@ -37,6 +37,8 @@ Note: these are a work-in-progress, and might not be 100% safe to use.
     {"rule": "grep @*"},
     {"rule": "tr @*"},
     {"rule": "cd @path"},
+    {"rule": "nohup @cmd"},
+    {"rule": "watch @(-n @int)? @cmd"},
     {"rule": "gh pr @{view,list,diff,checks} @*"},
     {"rule": "gh run @{view,list} @*"},
     {"rule": "ghc --version"},

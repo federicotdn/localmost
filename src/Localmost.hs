@@ -72,6 +72,7 @@ data Part
   | Choice [Part]
   | Group [Part]
   | Arg
+  | Cmd
   | Int
   | At
   | Path
@@ -85,6 +86,7 @@ instance Show Part where
   show (Choice list) = "Choice " ++ show list
   show (Group list) = "Group " ++ show list
   show Arg = "Arg"
+  show Cmd = "Cmd" -- Represents a nested Allow-policy'd command.
   show Int = "Int"
   show At = "At"
   show Path = "Path"
@@ -93,13 +95,14 @@ instance Show Part where
 data Command = Command
   { cmdParts :: [Part],
     cmdPipelineId :: Id,
-    cmdPolicy :: Maybe Policy, -- Only used for input commands, not rules.
     cmdPipeIn :: Bool,
     cmdPipeOut :: Bool,
     -- Counts all redirections.
     cmdAllRedirectsCount :: Int,
     -- Redirections to files only.
-    cmdRedirects :: [Redirect]
+    cmdRedirects :: [Redirect],
+    -- Only used for input commands, not rules.
+    cmdPolicy :: Maybe Policy
   }
   deriving (Show, Eq)
 
@@ -172,15 +175,55 @@ parseExcepts r = mapM parseOne (fromMaybe [] (rUnless r))
   where
     anything = Quant Arg (Count 0 Nothing)
     parseOne t = parseSingleCommand t "Unless clauses" r $ \c ->
-      Right $ Except ([anything] ++ cmdParts c ++ [anything])
+      if any cmdPartPresent (cmdParts c)
+        then
+          Left
+            ParseRuleError
+              { preErrors = [pack "@cmd is not allowed in unless clauses."],
+                preComments = [],
+                preRule = r
+              }
+        else Right $ Except ([anything] ++ cmdParts c ++ [anything])
 
 parseRule :: Policy -> ConfigRule -> Either ParseRuleError Rule
 parseRule pol r =
   parseSingleCommand (rRule r) "Rules" r $ \c -> do
+    validateCmdPart r c
     excepts <- parseExcepts r
     let pa = fromMaybe All (rPipe r) -- Allow all pipes by default.
         ra = fromMaybe Safe (rRedirect r) -- Allow safe redirects by default.
     Right Rule {rCommand = c, rPolicy = pol, rPipeAccess = pa, rRedirectAccess = ra, rExcepts = excepts}
+
+-- | @cmd may only appear as the final, top-level part of a rule. It cannot be
+-- nested inside groups, choices or quantifiers, and cannot be followed by
+-- other parts.
+validateCmdPart :: ConfigRule -> Command -> Either ParseRuleError ()
+validateCmdPart r c =
+  -- Drop a single trailing top-level @cmd (the only valid position), then
+  -- ensure no @cmd remains anywhere else.
+  let parts = case reverse (cmdParts c) of
+        (Cmd : rest) -> reverse rest
+        _ -> cmdParts c
+   in if any cmdPartPresent parts
+        then
+          Left
+            ParseRuleError
+              { preErrors =
+                  [ pack "@cmd may only appear as the last expression of"
+                      <> " a rule (not nested in groups, choices or quantifiers)."
+                  ],
+                preComments = [],
+                preRule = r
+              }
+        else Right ()
+
+cmdPartPresent :: Part -> Bool
+cmdPartPresent p = case p of
+  Cmd -> True
+  Choice ps -> any cmdPartPresent ps
+  Group ps -> any cmdPartPresent ps
+  Quant inner _ -> cmdPartPresent inner
+  _ -> False
 
 parseConfig :: Config -> Either [ParseRuleError] Runtime
 parseConfig config =
@@ -315,7 +358,7 @@ asMetaPart t =
             buildGroup inner $ Just s
           -- Do some extra validation.
           (AST.T_Literal _ "@") : (AST.T_Literal _ "{") : _ ->
-            Left ["Choice expressions @{...} must contain 2 or more elements."]
+            Left ["Choice expressions @{...} must contain two or more elements."]
           (AST.T_Literal _ "@") : _ ->
             Left ["Unknown meta var @."]
           -- Anything else: try to take as text, or as raw Token.
@@ -337,16 +380,19 @@ asMetaPart t =
 
 parseMetaExpr :: Parsec String () Part
 parseMetaExpr = do
-  meta <- P.choice $ map P.try [P.string "arg", P.string "int", P.string "path", P.string "@", P.string "*"]
+  meta <- P.choice $ map P.try [P.string "arg", P.string "int", P.string "path", P.string "cmd", P.string "@", P.string "*"]
   let meta' = case meta of
         "arg" -> Just Arg
         "int" -> Just Int
         "path" -> Just Path
+        "cmd" -> Just Cmd
         "@" -> Just At
         "*" -> Just $ Quant Arg (Count 0 Nothing) -- @* shortcut.
         _ -> Nothing
   result <- case meta' of
     Just m@(Quant _ _) -> pure m
+    -- @cmd does not accept quantifiers and consumes the rest of the command.
+    Just Cmd -> P.eof >> pure Cmd
     Just m -> do
       atEnd <- P.optionMaybe P.anyChar
       case atEnd of
@@ -382,7 +428,7 @@ parseQuantifier s part = case s of
 computePolicy :: Runtime -> Script -> Policy
 computePolicy rt input =
   let rules = rRules rt
-      input' = applyRules rules input
+      input' = applyRules True rules input
       input'' = if rSafeXargs rt then applySafeXargs rules input' else input'
       defaultPolicy = rDefaultPolicy rt
    in fromMaybe defaultPolicy (scriptPolicy input'')
@@ -402,7 +448,7 @@ applySafeXargs rules script = script {sCommands = go (sCommands script)}
        in if isCommand c2 "xargs" && cmdPipelineId c1 == cmdPipelineId c2
             then case buildTemp c1 c2 of
               Just temp ->
-                case applyRules rules (Script {sCommands = [temp]}) of
+                case applyRules True rules (Script {sCommands = [temp]}) of
                   Script {sCommands = [checked]} -> c1 : c2 {cmdPolicy = cmdPolicy checked} : go rest
                   _ -> continue
               Nothing -> continue
@@ -424,30 +470,71 @@ applySafeXargs rules script = script {sCommands = go (sCommands script)}
       (Literal l : _) -> l == name
       _ -> False
 
-applyRules :: [Rule] -> Script -> Script
-applyRules rules input = foldl (flip applyRule) input rules
+-- | @allowCmd@ controls whether @cmd rules are allowed to match. It is set to
+-- False when re-checking a sub-command extracted by an outer @cmd, which keeps
+-- recursion to a single level.
+applyRules :: Bool -> [Rule] -> Script -> Script
+applyRules allowCmd rules input = foldl (flip (applyRule allowCmd rules)) input rules
 
-applyRule :: Rule -> Script -> Script
-applyRule rule input =
+applyRule :: Bool -> [Rule] -> Rule -> Script -> Script
+applyRule allowCmd rules rule input =
   let inputCommands = sCommands input
       policy = rPolicy rule
       matchAndApply c =
-        if commandsMatch rule c
+        if commandsMatch allowCmd rules rule c
           then applyPolicy c policy
           else c
       transformed = map matchAndApply inputCommands
    in input {sCommands = transformed}
 
+subCommandAllowed :: [Rule] -> [Part] -> Bool
+subCommandAllowed rules parts =
+  let sub =
+        Command
+          { cmdParts = parts,
+            cmdPipelineId = AST.Id 0,
+            cmdPolicy = Nothing,
+            cmdPipeIn = False,
+            cmdPipeOut = False,
+            cmdAllRedirectsCount = 0,
+            cmdRedirects = []
+          }
+      checked = applyRules False rules (Script {sCommands = [sub]})
+   in case sCommands checked of
+        [c] -> cmdPolicy c == Just Allow
+        _ -> False
+
 applyPolicy :: Command -> Policy -> Command
 applyPolicy cmd policy = cmd {cmdPolicy = Just $ maybe policy (max policy) (cmdPolicy cmd)}
 
-commandsMatch :: Rule -> Command -> Bool
-commandsMatch rule@(Rule {rCommand = cmd}) input =
+commandsMatch :: Bool -> [Rule] -> Rule -> Command -> Bool
+commandsMatch allowCmd rules rule@(Rule {rCommand = cmd}) input =
   let mode = if rPolicy rule == Allow then Strict else Flexible
-   in allPartsMatch (cmdParts cmd) (cmdParts input) mode
+      partsMatch = case cmdHasTrailingCmd cmd of
+        Just prefix -> cmdMatches allowCmd rules prefix input mode
+        Nothing -> allPartsMatch (cmdParts cmd) (cmdParts input) mode
+   in partsMatch
         && pipesMatch rule input
         && redirectsMatch rule input
         && not (exceptsMatch rule input)
+
+-- | If a rule's parts end with @cmd, return the prefix parts before it.
+cmdHasTrailingCmd :: Command -> Maybe [Part]
+cmdHasTrailingCmd cmd = case reverse (cmdParts cmd) of
+  (Cmd : rest) -> Just (reverse rest)
+  _ -> Nothing
+
+cmdMatches :: Bool -> [Rule] -> [Part] -> Command -> Mode -> Bool
+cmdMatches allowCmd rules prefix input mode =
+  allowCmd
+    && any matchAt (splitPoints (cmdParts input))
+  where
+    -- @cmd must consume at least one input word (the sub-command name).
+    splitPoints iparts = [splitAt n iparts | n <- [0 .. length iparts - 1]]
+    matchAt (pre, post) =
+      not (null post)
+        && allPartsMatch prefix pre mode
+        && subCommandAllowed rules post
 
 exceptsMatch :: Rule -> Command -> Bool
 exceptsMatch Rule {rExcepts = excepts} input =

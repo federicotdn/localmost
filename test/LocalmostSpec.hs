@@ -70,6 +70,11 @@ spec = do
       let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
       mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
 
+    it "rejects @cmd outside the trailing position" $ do
+      let rules = ["foo @cmd*", "foo @cmd bar", "foo @(@cmd)", "foo @{@cmd,bar}"]
+      let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
+      mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
+
   describe "buildCommand" $ do
     it "detects pipe positions correctly" $ do
       case sCommands (sh "foo") of
