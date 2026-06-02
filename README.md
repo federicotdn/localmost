@@ -1,6 +1,6 @@
 # localmost
 
-A flexible and deterministic Claude Code `PreToolUse` tool based on [ShellCheck](https://www.shellcheck.net/).
+A flexible and deterministic Claude Code `PreToolUse` hook handler based on [ShellCheck](https://www.shellcheck.net/).
 
 Features:
 - Write permission rules using a regular expression-like syntax.
@@ -14,7 +14,7 @@ Features:
 
 ## How it Works
 
-Localmost uses the [PreToolUse](https://code.claude.com/docs/en/hooks#pretooluse) hook which fires before each bash command execution attempt, and based on a `config.json` file, decides on one of three possible policies: `allow`, `ask` or `deny`. The configuration file contains a list of `allow` and `deny` rules.
+Localmost is invoked by the [PreToolUse](https://code.claude.com/docs/en/hooks#pretooluse) hook which fires before each bash command execution attempt, and based on a `config.json` file, decides on one of three possible policies: `allow`, `ask` or `deny`. The configuration file contains a list of `allow` and `deny` rules.
 
 When Claude Code wants to execute a bash command, localmost parses all rules and the input command using ShellCheck. Then, it uses their AST representation to decide on a policy:
 
