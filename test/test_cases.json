@@ -187,6 +187,7 @@
       {"input": "echo x", "expect": "ask"},
       {"input": "echo $var", "expect": "ask"},
       {"input": "echo ${var}", "expect": "ask"},
+      {"input": "echo *.py", "expect": "ask"},
       {"input": "bar2 x", "expect": "allow"},
       {"input": "bar2 x y", "expect": "ask"},
       {"input": "bar2 x y z", "expect": "ask"},

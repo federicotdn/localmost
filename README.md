@@ -91,7 +91,7 @@ You can always validate your configuration file by running `localmost config val
 
 Following is an explanation of each top-level key for `config.json`:
 
-### `allow` and `deny`
+### Rules (`allow` and `deny`)
 
 These two keys can contain a list of rules.
 
@@ -104,7 +104,7 @@ Here's a full overview of the rules syntax:
 | `@arg`          | Matches any single argument. In `foo -a --xyz --test=bar baz --`, `-a`, `--xyz`, `--test=bar`, `baz` and `--` are each a separate argument. Note that an expression like `$var` will not match with `@arg` because there's no guarantee that it will expand to exactly one argument. |
 | `@path`         | Matches an argument that contains a valid path, in terms of allowed characters. For example, in Linux, `NUL` characters are not allowed in paths.                                                                                                                                    |
 | `@int`          | Matches an argument containing an integer value, e.g. `1234`.                                                                                                                                                                                                                        |
-| `@sub`          | Matches only a command that would result in an `allow` policy. Must be the last expression in a rule, and consumes the rest of the command. Example rule: `watch -n @int @sub`.                                                                                                      |
+| `@sub`          | Matches only a subcommand that would result in an `allow` policy. Must be the last expression in a rule, and consumes the rest of the command. Example rule: `watch -n @int @sub`.                                                                                                      |
 | `@@`            | Matches a literal `@` character.                                                                                                                                                                                                                                                     |
 | `@{v1,v2,v3}`   | Choice: matches one of `v1`, `v2` or `v3`.                                                                                                                                                                                                                                           |
 | `@(v1 v2 v3)`   | Group: matches `v1 v2 v3` in that specific order.                                                                                                                                                                                                                                    |
@@ -123,7 +123,7 @@ In addition to that, meta expressions can also have quantifiers:
 > [!TIP]
 > As a special case, `@*` is a shortcut for `@arg*`, allowing you to write e.g. `echo @*`.
 
-Rule matching is mechanichally similar to regular expressions, meaning that the order of the expressions matters. For example, the rule `foo -a -b` will match `foo -a -b` but not `foo -b -a`. Although this limits the expressiveness of rules, it helps keeping the matching logic much simpler. Additionally, some commands like `find` may behave differently depending on the order of provided flags, so matching (e.g. allowing) different orders could potentially be incorrect. This depends entirely on the flag semantics of each command, which localmost is not aware of in any way.
+Rule matching is mechanically similar to regular expressions, meaning that the order of the expressions matters. For example, the rule `foo -a -b` will match `foo -a -b` but not `foo -b -a`. Although this limits the expressiveness of rules, it helps keeping the matching logic much simpler. Additionally, some commands like `find` may behave differently depending on the order of provided flags, so matching (and potentially allowing) different orders could potentially be harmful. This depends entirely on the flag semantics of each command, of which localmost is not aware in any way.
 
 Additionally, each rule can also set the following keys:
 
@@ -146,9 +146,11 @@ Can be `true`, `false`, `"in"` or `"out"` (default: `true`):
 - `"in"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the very end of one.
 - `"out"` will make the rule match only if the subcommand is not part of a pipeline, or if it appears at the beginning of one.
 
-### `allowSafeXargs`
+In most cases, rules will require only the `rule` property to be set, keeping the overall configuration simpler.
 
-Can be set to `true` or `false` (default: `true`).
+### Safe `xargs` (`allowSafeXargs`)
+
+This top-level `config.json` option can be set to `true` or `false` (default: `true`).
 
 When set to `true`:
 - Commands in the shape of `echo ARGS | xargs PROG` will be marked as allowed if and only if checking for `PROG ARGS` would result in an `allow` policy. This feature also requires having an `allow` rule in place equivalent to `echo @arg*` (in order to allow for the `echo` to run).
