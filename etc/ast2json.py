@@ -94,9 +94,8 @@ class Parser:
     def parse_constructor(self):
         name = self.parse_conname()
 
-        # Record syntax: `Con {field = value, ...}`.
         self.skip_ws()
-        if self.peek() == "{":
+        if self.peek() == "{" and self._record_ahead():
             return self.parse_record(name)
 
         # Constructor application: collect following args until a terminator.
@@ -109,6 +108,19 @@ class Parser:
             args.append(self.parse_value())
 
         return self.build_conapp(name, args)
+
+    def _record_ahead(self):
+        j = self.i + 1
+        while j < self.n and self.s[j] == " ":
+            j += 1
+        start = j
+        while j < self.n and (self.s[j].isalnum() or self.s[j] in "_'"):
+            j += 1
+        if j == start:
+            return False
+        while j < self.n and self.s[j] == " ":
+            j += 1
+        return j < self.n and self.s[j] == "="
 
     def parse_record(self, name):
         self.expect("{")
