@@ -367,5 +367,17 @@
       {"input": "nohup echo > evil.txt", "expect": "ask"},
       {"input": "nohup echo | echo", "expect": "allow"}
     ]
+  },
+  {
+    "name": "escaping",
+    "config": {
+      "allow": [
+        {"rule": "find . -name @arg -exec cat {} \\;"}
+      ]
+    },
+    "cases": [
+      {"input": "find . -name foobar -exec cat {} \\;", "expect": "allow"},
+      {"input": "find . -name foobar -exec cat {} ;", "expect": "ask"}
+    ]
   }
 ]
