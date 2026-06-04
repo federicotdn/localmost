@@ -22,6 +22,5 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 vendor/
-notes.org
+todo.org
 TAGS
-test_args.py
