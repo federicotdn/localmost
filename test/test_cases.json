@@ -379,5 +379,57 @@
       {"input": "find . -name foobar -exec cat {} \\;", "expect": "allow"},
       {"input": "find . -name foobar -exec cat {} ;", "expect": "ask"}
     ]
+  },
+  {
+    "name": "env",
+    "config": {
+      "allow": [
+        {"rule": "foo @env"},
+        {"rule": "echo @*"},
+        {"rule": "env @env* @sub"}
+      ]
+    },
+    "cases": [
+      {"input": "foo FOO=bar", "expect": "allow"},
+      {"input": "foo _FOO=bar", "expect": "allow"},
+      {"input": "foo foo=bar", "expect": "allow"},
+      {"input": "foo F123=bar", "expect": "allow"},
+      {"input": "foo FOO=", "expect": "allow"},
+      {"input": "foo FOO=a=b", "expect": "allow"},
+      {"input": "foo FOO=bar/baz", "expect": "allow"},
+      {"input": "foo FOO=\"hola como te va\"", "expect": "allow"},
+      {"input": "foo FOO='hola como te va'", "expect": "allow"},
+      {"input": "foo 'FOO=hola como te va'", "expect": "allow"},
+      {"input": "foo", "expect": "ask"},
+      {"input": "foo 1FOO=bar", "expect": "ask"},
+      {"input": "foo []FOO=bar", "expect": "ask"},
+      {"input": "foo A[0]=bar", "expect": "ask"},
+      {"input": "foo FOO+=bar", "expect": "ask"},
+      {"input": "foo FO-O=bar", "expect": "ask"},
+      {"input": "foo =bar", "expect": "ask"},
+      {"input": "foo FOObar", "expect": "ask"},
+      {"input": "foo FOO=$(rm -rf /)", "expect": "ask"},
+      {"input": "foo FOO=bar BAZ=qux", "expect": "ask"},
+      {"input": "env echo hello", "expect": "allow"},
+      {"input": "env FOO=bar echo hello", "expect": "allow"},
+      {"input": "env FOO= echo hello", "expect": "allow"},
+      {"input": "env FOO= BAR=x echo hello", "expect": "allow"}
+    ]
+  },
+  {
+    "name": "env-quant",
+    "config": {
+      "allow": [
+        {"rule": "foo @env*"}
+      ]
+    },
+    "cases": [
+      {"input": "foo", "expect": "allow"},
+      {"input": "foo FOO=bar", "expect": "allow"},
+      {"input": "foo FOO=bar BAZ=qux", "expect": "allow"},
+      {"input": "foo FOO=bar BAZ=qux QUUX=", "expect": "allow"},
+      {"input": "foo FOO=bar baz", "expect": "ask"},
+      {"input": "foo 1FOO=bar", "expect": "ask"}
+    ]
   }
 ]

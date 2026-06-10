@@ -44,6 +44,7 @@ import System.FilePath (isValid)
 import Text.Parsec (Parsec)
 import Text.Parsec qualified as P
 import Text.Parsec.Error qualified as P
+import Text.Regex.TDFA ((=~))
 import Types
   ( Errors,
     PipeAccess (..),
@@ -73,6 +74,7 @@ data Part
   | Group [Part]
   | Arg
   | Sub
+  | Env
   | Int
   | At
   | Path
@@ -87,6 +89,7 @@ instance Show Part where
   show (Group list) = "Group " ++ show list
   show Arg = "Arg"
   show Sub = "Sub" -- Represents a nested Allow-policy'd command.
+  show Env = "Env" -- Represents FOO=bar
   show Int = "Int"
   show At = "At"
   show Path = "Path"
@@ -380,12 +383,24 @@ asMetaPart t =
 
 parseMetaExpr :: Parsec String () Part
 parseMetaExpr = do
-  meta <- P.choice $ map P.try [P.string "arg", P.string "int", P.string "path", P.string "sub", P.string "@", P.string "*"]
+  meta <-
+    P.choice $
+      map
+        P.try
+        [ P.string "arg",
+          P.string "int",
+          P.string "path",
+          P.string "sub",
+          P.string "env",
+          P.string "@",
+          P.string "*"
+        ]
   let meta' = case meta of
         "arg" -> Just Arg
         "int" -> Just Int
         "path" -> Just Path
         "sub" -> Just Sub
+        "env" -> Just Env
         "@" -> Just At
         "*" -> Just $ Quant Arg (Count 0 Nothing) -- @* shortcut.
         _ -> Nothing
@@ -631,6 +646,7 @@ partMatches rule input mode = case input of
       Int -> isInt inputText
       At -> inputText == "@"
       Path -> isValid $ unpack inputText
+      Env -> isEnv inputText
       Literal ruleText -> textMatches ruleText inputText mode
       -- Should not happen as all rule parts are
       -- either meta vars, or literals.
@@ -674,6 +690,9 @@ textMatches rule input mode =
           let flag = T.takeWhile (/= '=') $ T.drop 1 text
            in flag : map T.singleton (T.unpack flag)
       | otherwise = []
+
+isEnv :: Text -> Bool
+isEnv input = unpack input =~ ("^[A-Za-z_][A-Za-z0-9_]*=.*$" :: String)
 
 check :: Proto -> IO ()
 check proto = do

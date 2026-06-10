@@ -1,5 +1,9 @@
 # Localmost Changelog
+## **Unreleased**
+- Added `@env` meta expression, matching environment variable assignments (e.g. `FOO=bar`).
+
 ## **0.1.0.3** - 2026-06-02
+- Note: Due to a release mistake, the binary will self-report as `0.1.0.2`.
 - Added `@sub` meta expression, representing any allowed subcommand.
 
 ## **0.1.0.2** - 2026-04-23

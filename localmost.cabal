@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               localmost
-version:            0.1.0.2
+version:            0.1.0.4
 license:            GPL-3.0-only
 license-file:       LICENSE
 author:             Federico Tedin
@@ -34,6 +34,7 @@ library
                     , Config
     build-depends:    ShellCheck ==0.11.0
                     , aeson ^>=2.2.3.0
+                    , regex-tdfa ^>= 1.3.2.5
                     , bytestring
                     , text
                     , containers
