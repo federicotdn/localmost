@@ -33,6 +33,7 @@ data Config = Config
   { cAllow :: Maybe [ConfigRule],
     cDeny :: Maybe [ConfigRule],
     cAllowSafeXargs :: Maybe Bool,
+    cAskNoninteractive :: Maybe Bool,
     cDefault :: Maybe Policy,
     cPath :: Maybe FilePath
   }
@@ -48,7 +49,7 @@ configPath = do
   pure $ dir </> "config.json"
 
 defaultConfig :: Config
-defaultConfig = Config Nothing Nothing Nothing Nothing Nothing
+defaultConfig = Config Nothing Nothing Nothing Nothing Nothing Nothing
 
 initConfig :: IO ()
 initConfig = do
@@ -65,7 +66,8 @@ initConfig = do
                 cDeny = Nothing,
                 cPath = Nothing,
                 cDefault = Nothing,
-                cAllowSafeXargs = Nothing
+                cAllowSafeXargs = Nothing,
+                cAskNoninteractive = Nothing
               }
       BL.writeFile path (encode emptyConfig)
       putStrLn $ "Created configuration file at " ++ path ++ "."

@@ -162,6 +162,12 @@ If set to `false`, no special processing will be done for these situations.
 > [!WARNING]
 > Adding manual `allow` rules for `xargs` is not recommended, since `xargs` will read its arguments from `stdin`, which is not something a rule can operate on in any way.
 
+### Ask when non-interactive (`askNoninteractive`)
+
+This top-level `config.json` option can be set to `true` or `false` (default: `true`).
+
+In accept-edits mode there may be no human present to answer an `ask` prompt. By default (`true`), localmost still emits `ask` in this case. When set to `false`, an `ask` policy is instead turned into `deny` while in accept-edits mode (so that Claude Code can continue working).
+
 ## Usage
 
 Run `localmost --help` to see usage help.

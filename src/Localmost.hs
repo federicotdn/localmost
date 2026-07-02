@@ -75,6 +75,7 @@ data Part
   | Arg
   | Sub
   | Env
+  | Regex Text
   | Int
   | At
   | Path
@@ -90,6 +91,7 @@ instance Show Part where
   show Arg = "Arg"
   show Sub = "Sub" -- Represents a nested Allow-policy'd command.
   show Env = "Env" -- Represents FOO=bar
+  show (Regex r) = unpack $ "Regex " <> r
   show Int = "Int"
   show At = "At"
   show Path = "Path"
@@ -144,6 +146,7 @@ instance Show ParseRuleError where
 data Runtime = Runtime
   { rRules :: [Rule],
     rSafeXargs :: Bool,
+    rAskNoninteractive :: Bool,
     rDefaultPolicy :: Policy
   }
   deriving (Show)
@@ -240,10 +243,12 @@ parseConfig config =
    in if null allErrs
         then
           let safeXargs = fromMaybe True (cAllowSafeXargs config)
+              askNoninteractive = fromMaybe True (cAskNoninteractive config)
            in Right
                 Runtime
                   { rRules = pdeny ++ pallow,
                     rSafeXargs = safeXargs,
+                    rAskNoninteractive = askNoninteractive,
                     rDefaultPolicy = defaultPolicy
                   }
         else Left allErrs
@@ -392,6 +397,7 @@ parseMetaExpr = do
           P.string "path",
           P.string "sub",
           P.string "env",
+          P.string "re",
           P.string "@",
           P.string "*"
         ]
@@ -401,6 +407,7 @@ parseMetaExpr = do
         "path" -> Just Path
         "sub" -> Just Sub
         "env" -> Just Env
+        "re" -> Just $ Regex ""
         "@" -> Just At
         "*" -> Just $ Quant Arg (Count 0 Nothing) -- @* shortcut.
         _ -> Nothing
@@ -706,7 +713,7 @@ check proto = do
           Right cmd -> case astAsScript (parseShellScript (iText cmd)) False of
             Right input ->
               let policy = computePolicy runtime input
-                  policy' = if not (iInteractive cmd) && policy == Ask then Deny else policy
+                  policy' = if not (rAskNoninteractive runtime) && not (iInteractive cmd) && policy == Ask then Deny else policy
                   reason =
                     if policy' == Deny
                       then

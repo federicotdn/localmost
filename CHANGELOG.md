@@ -1,6 +1,7 @@
 # Localmost Changelog
 ## **Unreleased**
 - Added `@env` meta expression, matching environment variable assignments (e.g. `FOO=bar`).
+- Added `askNoninteractive` option (default `true`). When `false`, `ask` becomes `deny` in accept-edits mode.
 
 ## **0.1.0.3** - 2026-06-02
 - Note: Due to a release mistake, the binary will self-report as `0.1.0.2`.
