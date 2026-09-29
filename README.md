@@ -166,8 +166,6 @@ If set to `false`, no special processing will be done for these situations.
 
 This top-level `config.json` option can be set to `true` or `false` (default: `true`).
 
-Note: in `auto` mode, localmost never emits `ask`, and instead outputs no decision so that the `auto` mode classifier decides.
-
 In accept-edits mode there may be no human present to answer an `ask` prompt. By default (`true`), localmost still emits `ask` in this case. When set to `false`, an `ask` policy is instead turned into `deny` while in accept-edits mode (so that Claude Code can continue working).
 
 ## Usage
@@ -182,6 +180,7 @@ echo 'ls -a' | localmost check --mode text
 
 ## Tips
 
+- In [auto mode](https://code.claude.com/docs/en/auto-mode-config), when localmost would emit `ask`, it instead outputs no decision so that the auto mode classifier decides. Localmost still emits `allow` and `deny` when appropriate, giving you a combination of deterministic and nondeterministic behaviour depending on the command.
 - Only use `@arg*`/`@*` for commands that you are very familiar with, and are sure that cannot be used in a destructive way, e.g. `echo` or `ls`. If you do use `@arg`/`@*`, consider adding `unless` clauses as well in order to un-match specific flags.
 - An `unless` value of `["-a", "-b", "-c"]` can also be written as `["@{-a,-b,-c}"]`, making it a bit more compact.
 - Use `@sub` for commands that take other commands as input, e.g. `watch`, `nohup`, etc.
