@@ -41,6 +41,16 @@ spec = do
       let cfg = defaultConfig {cAllow = Just [tr {rRule = ""}]}
       parseConfig cfg `shouldSatisfy` isLeft
 
+    it "rejects rules with variable assignments" $ do
+      let rules = ["foo=bar", "FOO=bar ls", "a=1 b=2"]
+      let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
+      mapM_ (\r -> parse r `shouldSatisfy` isLeft) rules
+
+    it "accepts env rules with assignment arguments" $ do
+      let rules = ["env FOO=bar ls", "env @env+ @sub"]
+      let parse r = parseConfig defaultConfig {cAllow = Just [tr {rRule = r}]}
+      mapM_ (\r -> parse r `shouldSatisfy` isRight) rules
+
     it "rejects except clauses with multiple commands" $ do
       let excepts = ["foo | bar", "foo && bar", "foo; bar"]
       let parse e = parseConfig defaultConfig {cAllow = Just [tr {rUnless = Just [e]}]}

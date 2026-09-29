@@ -431,5 +431,30 @@
       {"input": "foo FOO=bar baz", "expect": "ask"},
       {"input": "foo 1FOO=bar", "expect": "ask"}
     ]
+  },
+  {
+    "name": "assignments",
+    "config": {
+      "allow": [
+        {"rule": "ls @*"}
+      ]
+    },
+    "cases": [
+      {"input": "foo=bar", "expect": "allow"},
+      {"input": "foo2=/tmp/x; ls \"$foo2\"", "expect": "allow"},
+      {"input": "s=1", "expect": "allow"},
+      {"input": "S=1", "expect": "allow"},
+      {"input": "a=(x y); b[0]=z; c+=1", "expect": "allow"},
+      {"input": "d=$(ls)", "expect": "allow"},
+      {"input": "d=$(rm -rf x)", "expect": "ask"},
+      {"input": "foo=bar > out", "expect": "ask"},
+      {"input": "foo=bar 2>/dev/null", "expect": "allow"},
+      {"input": "FOO=bar", "expect": "ask"},
+      {"input": "my_var=1", "expect": "ask"},
+      {"input": "https_proxy=x", "expect": "ask"},
+      {"input": "PATH=/tmp/evil; ls", "expect": "ask"},
+      {"input": "foo=bar ls", "expect": "allow"},
+      {"input": "LD_PRELOAD=/tmp/x.so ls", "expect": "ask"}
+    ]
   }
 ]

@@ -19,6 +19,7 @@ where
 import Config (Config (..), ConfigRule (..), configPath, loadConfig)
 import Control.Monad (void, when)
 import Data.Either (partitionEithers)
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Foldable (for_)
 import Data.IntSet qualified as IntSet
 import Data.List (elemIndex, inits, tails)
@@ -106,6 +107,8 @@ data Command = Command
     cmdAllRedirectsCount :: Int,
     -- Redirections to files only.
     cmdRedirects :: [Redirect],
+    -- Names of variables assigned by the command (e.g. FOO in FOO=bar ls).
+    cmdAssignments :: [Text],
     -- Only used for input commands, not rules.
     cmdPolicy :: Maybe Policy
   }
@@ -194,6 +197,13 @@ parseExcepts r = mapM parseOne (fromMaybe [] (rUnless r))
 parseRule :: Policy -> ConfigRule -> Either ParseRuleError Rule
 parseRule pol r =
   parseSingleCommand (rRule r) "Rules" r $ \c -> do
+    when (null (cmdParts c) || not (null (cmdAssignments c))) $
+      Left
+        ParseRuleError
+          { preErrors = [pack "Rules must contain a command, and must not contain variable assignments."],
+            preComments = [],
+            preRule = r
+          }
     validateSubPart r c
     excepts <- parseExcepts r
     let pa = fromMaybe All (rPipe r) -- Allow all pipes by default.
@@ -287,7 +297,8 @@ buildCommand (AST.T_Pipeline pipeId _ cmds, redir@(AST.T_Redirecting _ redirs cm
         cmdPipeIn = pipeIn,
         cmdPipeOut = pipeOut,
         cmdAllRedirectsCount = length redirs,
-        cmdRedirects = extractedRedirs
+        cmdRedirects = extractedRedirs,
+        cmdAssignments = assignmentNames cmd
       }
 buildCommand (AST.T_Pipeline {}, t) _ = unexpectedToken t
 buildCommand (t, _) _ = unexpectedToken t
@@ -319,6 +330,11 @@ simpleCommandParts t isRule = case t of
       then mapM asMetaPart list
       else Right (map asLiteralPart list)
   _ -> unexpectedToken t
+
+assignmentNames :: AST.Token -> [Text]
+assignmentNames t = case t of
+  AST.T_SimpleCommand _ assigns _ -> [pack name | AST.T_Assignment _ _ name _ _ <- assigns]
+  _ -> []
 
 asLiteralPart :: AST.Token -> Part
 asLiteralPart token = case literalText token False of
@@ -452,8 +468,32 @@ computePolicy rt input =
   let rules = rRules rt
       input' = applyRules True rules input
       input'' = if rSafeXargs rt then applySafeXargs rules input' else input'
+      input''' = applyAssignments input''
       defaultPolicy = rDefaultPolicy rt
-   in fromMaybe defaultPolicy (scriptPolicy input'')
+   in fromMaybe defaultPolicy (scriptPolicy input''')
+
+-- | Allows bare variable assignments (e.g. foo=bar), as long as they only
+-- assign safe variables. Command substitutions in assigned values are
+-- separate commands, and are checked on their own. Commands that assign
+-- other variables (either bare or as a prefix, e.g. PATH=x ls) are never
+-- allowed.
+applyAssignments :: Script -> Script
+applyAssignments script = script {sCommands = map apply (sCommands script)}
+  where
+    apply c
+      | not (all isSafeVar (cmdAssignments c)) =
+          if cmdPolicy c == Just Allow then c {cmdPolicy = Just Ask} else c
+      | null (cmdParts c) && not (null (cmdAssignments c)) && safeRedirects c && isNothing (cmdPolicy c) =
+          c {cmdPolicy = Just Allow}
+      | otherwise = c
+
+-- | Environment variables that change how commands behave are conventionally
+-- upper case (or contain underscores, e.g. https_proxy), so only allow
+-- variables made of lower case letters and digits, or single-letter ones.
+isSafeVar :: Text -> Bool
+isSafeVar name =
+  T.all (\ch -> isAsciiLower ch || isDigit ch) name
+    || (T.length name == 1 && T.all isAsciiUpper name)
 
 scriptPolicy :: Script -> Maybe Policy
 scriptPolicy Script {sCommands = cmds} =
@@ -519,7 +559,8 @@ subIsAllowed rules parts =
             cmdPipeIn = False,
             cmdPipeOut = False,
             cmdAllRedirectsCount = 0,
-            cmdRedirects = []
+            cmdRedirects = [],
+            cmdAssignments = []
           }
       checked = applyRules False rules (Script {sCommands = [sub]})
    in case sCommands checked of
@@ -570,7 +611,10 @@ redirectsMatch :: Rule -> Command -> Bool
 redirectsMatch Rule {rRedirectAccess = ra} input = case ra of
   RAAll -> True
   RANone -> null (cmdRedirects input)
-  Safe -> all isSafe (cmdRedirects input)
+  Safe -> safeRedirects input
+
+safeRedirects :: Command -> Bool
+safeRedirects input = all isSafe (cmdRedirects input)
   where
     isSafe r@(StaticPath _ m) = r `elem` safePaths || m == Read
     isSafe (DynamicPath _ m) = m == Read

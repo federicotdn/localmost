@@ -1,5 +1,8 @@
 # Localmost Changelog
 ## **Unreleased**
+- Allow bare assignments to variables made of lower case letters and digits, or single-letter ones (e.g. `foo2=bar`, `X=1`).
+- Fixed prefix assignments being ignored (e.g. `LD_PRELOAD=x ls` was allowed). Now only the variables above are allowed.
+- Rules can no longer contain variable assignments.
 - Added `@env` meta expression, matching environment variable assignments (e.g. `FOO=bar`).
 - Added `askNoninteractive` option (default `true`). When `false`, `ask` becomes `deny` in accept-edits mode.
 
