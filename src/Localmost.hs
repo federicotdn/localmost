@@ -765,7 +765,11 @@ check proto = do
                           "[localmost] Command execution denied."
                             <> "\nRun 'localmost config show' to see command permissions."
                       else Nothing
-               in pWritePolicy proto (PolicyOutput policy' reason)
+               in -- In auto mode, output no decision instead of Ask, so that
+                  -- the auto mode classifier decides instead of prompting.
+                  if iAuto cmd && policy' == Ask
+                    then pure ()
+                    else pWritePolicy proto (PolicyOutput policy' reason)
             Left errs -> pWriteErrors proto errs
       Left errs ->
         pWriteErrors

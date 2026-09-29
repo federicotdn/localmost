@@ -3,6 +3,7 @@
 - Allow bare assignments to variables made of lower case letters and digits, or single-letter ones (e.g. `foo2=bar`, `X=1`).
 - Fixed prefix assignments being ignored (e.g. `LD_PRELOAD=x ls` was allowed). Now only the variables above are allowed.
 - Rules can no longer contain variable assignments.
+- In auto mode, output no decision instead of `ask`, letting the auto mode classifier decide.
 - Added `@env` meta expression, matching environment variable assignments (e.g. `FOO=bar`).
 - Added `askNoninteractive` option (default `true`). When `false`, `ask` becomes `deny` in accept-edits mode.
 

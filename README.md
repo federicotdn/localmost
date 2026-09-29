@@ -166,6 +166,8 @@ If set to `false`, no special processing will be done for these situations.
 
 This top-level `config.json` option can be set to `true` or `false` (default: `true`).
 
+Note: in `auto` mode, localmost never emits `ask`, and instead outputs no decision so that the `auto` mode classifier decides.
+
 In accept-edits mode there may be no human present to answer an `ask` prompt. By default (`true`), localmost still emits `ask` in this case. When set to `false`, an `ask` policy is instead turned into `deny` while in accept-edits mode (so that Claude Code can continue working).
 
 ## Usage

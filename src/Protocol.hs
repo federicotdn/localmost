@@ -25,7 +25,7 @@ import GHC.Generics (Generic)
 import Types (Errors, Policy (..))
 import Utils (ePutStrLn, jsonOptions, jsonOptionsLax)
 
-data Input = Input {iText :: Text, iInteractive :: Bool}
+data Input = Input {iText :: Text, iInteractive :: Bool, iAuto :: Bool}
 
 data PolicyOutput = PolicyOutput {pPolicy :: Policy, pReason :: Maybe Text}
 
@@ -86,7 +86,8 @@ readInput = do
         Right $
           Input
             { iText = iCommand (hTool_input event),
-              iInteractive = hPermission_mode event /= Just "acceptEdits"
+              iInteractive = hPermission_mode event /= Just "acceptEdits",
+              iAuto = hPermission_mode event == Just "auto"
             }
 
 claudeCode :: Proto
@@ -102,7 +103,7 @@ claudeCode =
 simpleText :: Proto
 simpleText =
   Proto
-    { pReadInput = Right . (`Input` True) <$> TIO.getContents,
+    { pReadInput = (\t -> Right $ Input t True False) <$> TIO.getContents,
       pWritePolicy = putStrLn . map toLower . show . pPolicy,
       pWriteErrors = \errs -> ePutStrLn $ "[localmost] Error: " ++ show (intercalate ", " errs)
     }
