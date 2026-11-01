@@ -9,9 +9,6 @@ test:
 repl:
 	cabal repl -j
 
-validate:
-	cabal run -j localmost -- validate
-
 install:
 	cabal install -j -f -dev --overwrite-policy=always
 
