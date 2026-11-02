@@ -162,7 +162,7 @@ If set to `false`, no special processing will be done for these situations.
 > [!WARNING]
 > Adding manual `allow` rules for `xargs` is not recommended, since `xargs` will read its arguments from `stdin`, which is not something a rule can operate on in any way.
 
-### Ask when non-interactive (`askNoninteractive`)
+### Ask in accept-edits mode (`askAcceptEdits`)
 
 This top-level `config.json` option can be set to `true` or `false` (default: `true`).
 

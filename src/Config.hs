@@ -33,7 +33,7 @@ data Config = Config
   { cAllow :: Maybe [ConfigRule],
     cDeny :: Maybe [ConfigRule],
     cAllowSafeXargs :: Maybe Bool,
-    cAskNoninteractive :: Maybe Bool,
+    cAskAcceptEdits :: Maybe Bool,
     cDefault :: Maybe Policy,
     cPath :: Maybe FilePath
   }
@@ -67,7 +67,7 @@ initConfig = do
                 cPath = Nothing,
                 cDefault = Nothing,
                 cAllowSafeXargs = Nothing,
-                cAskNoninteractive = Nothing
+                cAskAcceptEdits = Nothing
               }
       BL.writeFile path (encode emptyConfig)
       putStrLn $ "Created configuration file at " ++ path ++ "."

@@ -1,4 +1,7 @@
 # Localmost Changelog
+## **Unreleased**
+- Renamed `askNoninteractive` option to `askAcceptEdits`.
+
 ## **0.1.0.4** - 2026-09-29
 - Allow bare assignments to variables made of lower case letters and digits, or single-letter ones (e.g. `foo2=bar`, `X=1`).
 - Fixed prefix assignments being ignored (e.g. `LD_PRELOAD=x ls` was allowed). Now only the variables above are allowed.

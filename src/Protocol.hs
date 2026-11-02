@@ -25,7 +25,7 @@ import GHC.Generics (Generic)
 import Types (Errors, Policy (..))
 import Utils (ePutStrLn, jsonOptions, jsonOptionsLax)
 
-data Input = Input {iText :: Text, iInteractive :: Bool, iAuto :: Bool}
+data Input = Input {iText :: Text, iAcceptEdits :: Bool, iAuto :: Bool}
 
 data PolicyOutput = PolicyOutput {pPolicy :: Policy, pReason :: Maybe Text}
 
@@ -86,7 +86,7 @@ readInput = do
         Right $
           Input
             { iText = iCommand (hTool_input event),
-              iInteractive = hPermission_mode event /= Just "acceptEdits",
+              iAcceptEdits = hPermission_mode event == Just "acceptEdits",
               iAuto = hPermission_mode event == Just "auto"
             }
 

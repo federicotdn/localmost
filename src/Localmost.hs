@@ -18,8 +18,8 @@ where
 
 import Config (Config (..), ConfigRule (..), configPath, loadConfig)
 import Control.Monad (void, when)
-import Data.Either (partitionEithers)
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.Either (partitionEithers)
 import Data.Foldable (for_)
 import Data.IntSet qualified as IntSet
 import Data.List (elemIndex, inits, tails)
@@ -53,6 +53,12 @@ import Types
     RedirectAccess (..),
   )
 import Utils (ePutStrLn, isInt)
+
+deniedReason :: Text
+deniedReason =
+  "[localmost] Command execution denied."
+    <> "\nRun 'localmost config show' to see command permissions."
+    <> "\nNote: commands built from variables (e.g. 'a=echo; \"$a\" hello') may match configured deny rules."
 
 data RedirectMode = Read | Write deriving (Show, Eq)
 
@@ -149,7 +155,7 @@ instance Show ParseRuleError where
 data Runtime = Runtime
   { rRules :: [Rule],
     rSafeXargs :: Bool,
-    rAskNoninteractive :: Bool,
+    rAskAcceptEdits :: Bool,
     rDefaultPolicy :: Policy
   }
   deriving (Show)
@@ -253,12 +259,12 @@ parseConfig config =
    in if null allErrs
         then
           let safeXargs = fromMaybe True (cAllowSafeXargs config)
-              askNoninteractive = fromMaybe True (cAskNoninteractive config)
+              askAcceptEdits = fromMaybe True (cAskAcceptEdits config)
            in Right
                 Runtime
                   { rRules = pdeny ++ pallow,
                     rSafeXargs = safeXargs,
-                    rAskNoninteractive = askNoninteractive,
+                    rAskAcceptEdits = askAcceptEdits,
                     rDefaultPolicy = defaultPolicy
                   }
         else Left allErrs
@@ -757,14 +763,8 @@ check proto = do
           Right cmd -> case astAsScript (parseShellScript (iText cmd)) False of
             Right input ->
               let policy = computePolicy runtime input
-                  policy' = if not (rAskNoninteractive runtime) && not (iInteractive cmd) && policy == Ask then Deny else policy
-                  reason =
-                    if policy' == Deny
-                      then
-                        Just $
-                          "[localmost] Command execution denied."
-                            <> "\nRun 'localmost config show' to see command permissions."
-                      else Nothing
+                  policy' = if not (rAskAcceptEdits runtime) && iAcceptEdits cmd && policy == Ask then Deny else policy
+                  reason = if policy' == Deny then Just deniedReason else Nothing
                in -- In auto mode, output no decision instead of Ask, so that
                   -- the auto mode classifier decides instead of prompting.
                   if iAuto cmd && policy' == Ask
